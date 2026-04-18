@@ -5,6 +5,7 @@ import 'core/providers/app_state.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/neubrut_tokens.dart';
 import 'app/app_shell.dart';
+import 'features/study_hub/services/hub_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,8 +25,11 @@ class LuminaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AppState()..initialize(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppState()..initialize()),
+        ChangeNotifierProvider(create: (_) => HubService()),
+      ],
       child: MaterialApp(
         title: 'LockIn',
         debugShowCheckedModeBanner: false,

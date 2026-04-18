@@ -7,6 +7,7 @@ import '../../features/timetable/timetable_screen.dart';
 import '../../features/attendance/attendance_screen.dart';
 import '../../features/focus/focus_screen.dart';
 import '../../features/assistant/assistant_screen.dart';
+import '../../features/study_hub/screens/rooms_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -22,13 +23,14 @@ class _AppShellState extends State<AppShell> {
     setState(() => _currentIndex = index);
   }
 
-  // Nav items: icon + label
+  // Nav items: icon + label + accent colour
   static const _navItems = [
-    (Icons.dashboard_rounded,       'Home'),
-    (Icons.calendar_month_rounded,  'Schedule'),
-    (Icons.fact_check_rounded,      'Attend'),
-    (Icons.psychology_rounded,      'Focus'),
-    (Icons.smart_toy_rounded,       'Ask AI'),
+    (Icons.dashboard_rounded,       'Home',     NBColors.primary),
+    (Icons.calendar_month_rounded,  'Schedule', NBColors.blue),
+    (Icons.fact_check_rounded,      'Attend',   NBColors.green),
+    (Icons.psychology_rounded,      'Focus',    NBColors.purple),
+    (Icons.smart_toy_rounded,       'Ask AI',   NBColors.pink),
+    (Icons.groups_rounded,          'Hub',      NBColors.orange),
   ];
 
   @override
@@ -43,6 +45,7 @@ class _AppShellState extends State<AppShell> {
           const AttendanceScreen(),
           const FocusScreen(),
           const AssistantScreen(),
+          const StudyHubRoomsScreen(),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
@@ -51,24 +54,23 @@ class _AppShellState extends State<AppShell> {
 
   Widget _buildBottomNav() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: NBColors.white,
-        border: const Border(
+        border: Border(
           top: BorderSide(color: NBColors.black, width: 2),
         ),
-        // Hard shadow going up
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(color: NBColors.black, offset: Offset(0, -3), blurRadius: 0),
         ],
       ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(_navItems.length, (i) {
-              return _navItem(i, _navItems[i].$1, _navItems[i].$2);
+              return _navItem(i, _navItems[i].$1, _navItems[i].$2, _navItems[i].$3);
             }),
           ),
         ),
@@ -76,7 +78,7 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  Widget _navItem(int index, IconData icon, String label) {
+  Widget _navItem(int index, IconData icon, String label, Color accent) {
     final isActive = _currentIndex == index;
 
     return GestureDetector(
@@ -86,30 +88,24 @@ class _AppShellState extends State<AppShell> {
         duration: const Duration(milliseconds: 120),
         curve: Curves.easeOut,
         padding: EdgeInsets.symmetric(
-          horizontal: isActive ? 14 : 10,
-          vertical: 8,
+          horizontal: isActive ? 10 : 8,
+          vertical: 6,
         ),
         decoration: BoxDecoration(
-          color: isActive ? NBColors.primary : Colors.transparent,
-          border: isActive
-              ? Border.all(color: NBColors.black, width: 2)
-              : null,
+          color: isActive ? accent : Colors.transparent,
+          border: isActive ? Border.all(color: NBColors.black, width: 2) : null,
           borderRadius: NBRadius.softAll,
           boxShadow: isActive ? NBShadows.small : null,
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: NBColors.black,
-              size: 22,
-            ),
+            Icon(icon, color: NBColors.black, size: 20),
             if (isActive) ...[
-              const SizedBox(width: 6),
+              const SizedBox(height: 2),
               Text(
                 label.toUpperCase(),
-                style: NBText.label.copyWith(fontSize: 11),
+                style: NBText.label.copyWith(fontSize: 8, letterSpacing: 0.8),
               ),
             ],
           ],
