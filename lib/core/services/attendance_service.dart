@@ -1,5 +1,19 @@
 import '../utils/constants.dart';
 
+class AttendanceAnalytics {
+  final double currentPercentage;
+  final int classesNeeded;
+  final int bunkBudget;
+
+  const AttendanceAnalytics({
+    required this.currentPercentage,
+    required this.classesNeeded,
+    required this.bunkBudget,
+  });
+
+  bool get isAtRisk => currentPercentage < 75;
+}
+
 class AttendanceRecord {
   final String subject;
   int attended;
@@ -15,22 +29,16 @@ class AttendanceRecord {
 
   /// Classes needed to reach target attendance
   int classesToReachTarget({double target = 75.0}) {
+    if (target <= 0 || target >= 100) return 0;
     if (percentage >= target) return 0;
-    // Solve: (attended + x) / (total + x) >= target/100
-    // attended + x >= (target/100) * (total + x)
-    // attended + x >= target*total/100 + target*x/100
-    // x * (1 - target/100) >= target*total/100 - attended
-    // x >= (target*total/100 - attended) / (1 - target/100)
     final needed = ((target * total / 100) - attended) / (1 - target / 100);
     return needed.ceil().clamp(0, 999);
   }
 
   /// How many classes can be bunked and stay at/above target
   int safeBunks({double target = 75.0}) {
+    if (target <= 0 || target >= 100) return 0;
     if (percentage < target) return 0;
-    // Solve: attended / (total + x) >= target/100
-    // attended * 100 >= target * (total + x)
-    // attended * 100 / target - total >= x
     final canBunk = (attended * 100 / target) - total;
     return canBunk.floor().clamp(0, 999);
   }
@@ -79,8 +87,10 @@ class AttendanceService {
   }
 
   int get totalSafeBunks {
-    // Overall safe bunks based on aggregate
-    final totalAttended = _records.values.fold<int>(0, (s, r) => s + r.attended);
+    final totalAttended = _records.values.fold<int>(
+      0,
+      (s, r) => s + r.attended,
+    );
     final totalClasses = _records.values.fold<int>(0, (s, r) => s + r.total);
     if (totalClasses == 0) return 0;
     final canBunk = (totalAttended * 100 / 75) - totalClasses;
@@ -88,7 +98,10 @@ class AttendanceService {
   }
 
   int get classesToRecover {
-    final totalAttended = _records.values.fold<int>(0, (s, r) => s + r.attended);
+    final totalAttended = _records.values.fold<int>(
+      0,
+      (s, r) => s + r.attended,
+    );
     final totalClasses = _records.values.fold<int>(0, (s, r) => s + r.total);
     if (totalClasses == 0) return 0;
     final pct = (totalAttended / totalClasses) * 100;
@@ -112,7 +125,39 @@ class AttendanceService {
 
   void addSubject(String subject) {
     if (!_records.containsKey(subject)) {
-      _records[subject] = AttendanceRecord(subject: subject, attended: 0, total: 0);
+      _records[subject] = AttendanceRecord(
+        subject: subject,
+        attended: 0,
+        total: 0,
+      );
     }
+  }
+
+  void syncSubjects(Iterable<String> subjects) {
+    for (final subject in subjects) {
+      addSubject(subject);
+    }
+  }
+
+  AttendanceAnalytics analyticsForSubject(
+    String subject, {
+    double target = AppConstants.attendanceThreshold,
+  }) {
+    final record =
+        _records[subject] ??
+        AttendanceRecord(subject: subject, attended: 0, total: 0);
+    return AttendanceAnalytics(
+      currentPercentage: record.percentage,
+      classesNeeded: record.classesToReachTarget(target: target),
+      bunkBudget: record.safeBunks(target: target),
+    );
+  }
+
+  AttendanceAnalytics get overallAnalytics {
+    return AttendanceAnalytics(
+      currentPercentage: overallPercentage,
+      classesNeeded: classesToRecover,
+      bunkBudget: totalSafeBunks,
+    );
   }
 }

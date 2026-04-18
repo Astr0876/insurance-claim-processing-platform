@@ -131,9 +131,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           const SizedBox(height: 4),
           Row(
             children: [
-              Expanded(
-                child: Text('LUMINA', style: NBText.heading1),
-              ),
+              Expanded(child: Text('LUMINA', style: NBText.heading1)),
               // Profile badge
               Container(
                 padding: const EdgeInsets.all(10),
@@ -154,11 +152,15 @@ class _DashboardScreenState extends State<DashboardScreen>
           const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            color: NBColors.black,
+            decoration: BoxDecoration(
+              color: NBColors.primary,
+              border: Border.all(color: NBColors.black, width: 1.5),
+              borderRadius: NBRadius.softAll,
+            ),
             child: Text(
               'Your Proactive Student Sidekick',
               style: NBText.label.copyWith(
-                color: NBColors.white,
+                color: NBColors.black,
                 letterSpacing: 1.5,
                 fontSize: 10,
               ),
@@ -257,8 +259,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildStatsRow(AppState state) {
     final attendance = state.attendance.overallPercentage;
     final focusScore = state.focus.todayFocusScore;
-    final studyMins  = state.focus.todayStudyMinutes;
-    final attColor   = NBColors.statusColor(attendance);
+    final studyMins = state.focus.todayStudyMinutes;
+    final attColor = NBColors.statusColor(attendance);
     final focusColor = NBColors.statusColor(focusScore);
 
     return Padding(
@@ -292,14 +294,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                     strokeWidth: 8,
                     child: Text(
                       '${attendance.round()}%',
-                      style: NBText.monoSmall.copyWith(color: attColor, fontSize: 16),
+                      style: NBText.monoSmall.copyWith(
+                        color: attColor,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                   const SizedBox(height: NBSpacing.sm),
-                  Text(
-                    'ATTENDANCE',
-                    style: NBText.label.copyWith(fontSize: 9),
-                  ),
+                  Text('ATTENDANCE', style: NBText.label.copyWith(fontSize: 9)),
                 ],
               ),
             ),
@@ -317,7 +319,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.psychology_rounded, color: focusColor, size: 18),
+                      Icon(
+                        Icons.psychology_rounded,
+                        color: focusColor,
+                        size: 18,
+                      ),
                       const Spacer(),
                       NBBadge(
                         label: TimeHelper.formatDuration(studyMins),
@@ -334,7 +340,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                     strokeWidth: 8,
                     child: Text(
                       '${focusScore.round()}',
-                      style: NBText.monoSmall.copyWith(color: focusColor, fontSize: 16),
+                      style: NBText.monoSmall.copyWith(
+                        color: focusColor,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                   const SizedBox(height: NBSpacing.sm),
@@ -356,6 +365,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildUpcomingClass(AppState state) {
     final nextClass = state.timetable.getNextClass();
     final todayCount = state.timetable.totalClassesToday;
+    final widgetData = state.widgetSnapshot;
+    final riskColor = widgetData.riskLabel == 'HIGH'
+        ? NBColors.danger
+        : widgetData.riskLabel == 'MEDIUM'
+        ? NBColors.orange
+        : NBColors.green;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
@@ -367,37 +382,53 @@ class _DashboardScreenState extends State<DashboardScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.schedule_rounded, color: NBColors.black, size: 20),
+                const Icon(
+                  Icons.schedule_rounded,
+                  color: NBColors.black,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Text('UP NEXT', style: NBText.label.copyWith(letterSpacing: 2)),
                 const Spacer(),
                 NBBadge(
+                  label: 'Risk ${widgetData.riskLabel}',
+                  fillColor: riskColor,
+                  textColor: NBColors.black,
+                ),
+                const SizedBox(width: 6),
+                NBBadge(
                   label: '$todayCount classes today',
-                  fillColor: NBColors.black,
-                  textColor: NBColors.white,
+                  fillColor: NBColors.white,
+                  textColor: NBColors.black,
                 ),
               ],
             ),
             const SizedBox(height: NBSpacing.md),
             if (nextClass != null) ...[
-              Text(
-                nextClass.subject,
-                style: NBText.heading2,
-              ),
+              Text(widgetData.nextClassLabel, style: NBText.heading2),
               const SizedBox(height: 8),
               Wrap(
                 spacing: NBSpacing.md,
                 children: [
-                  _infoChip(Icons.access_time_rounded, nextClass.time),
+                  _infoChip(
+                    Icons.access_time_rounded,
+                    widgetData.nextClassTime,
+                  ),
                   _infoChip(Icons.room_rounded, nextClass.room),
-                  _infoChip(Icons.timer_rounded, '${nextClass.durationMinutes}min'),
+                  _infoChip(
+                    Icons.timer_rounded,
+                    '${nextClass.durationMinutes}min',
+                  ),
                 ],
               ),
             ] else
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     color: NBColors.green,
                     child: Text(
                       'No more classes today! 🎉',
@@ -427,10 +458,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildQuickActions() {
     final actions = [
-      (Icons.calendar_month_rounded, 'Timetable',  NBColors.blue,   1),
-      (Icons.fact_check_rounded,     'Attendance', NBColors.green,  2),
-      (Icons.psychology_rounded,     'Focus',      NBColors.purple, 3),
-      (Icons.smart_toy_rounded,      'Ask AI',     NBColors.pink,   4),
+      (Icons.calendar_month_rounded, 'Timetable', NBColors.blue, 1),
+      (Icons.fact_check_rounded, 'Attendance', NBColors.green, 2),
+      (Icons.psychology_rounded, 'Focus', NBColors.purple, 3),
+      (Icons.smart_toy_rounded, 'Ask AI', NBColors.pink, 4),
     ];
 
     return Padding(
@@ -444,11 +475,9 @@ class _DashboardScreenState extends State<DashboardScreen>
             children: actions.map((a) {
               return Expanded(
                 child: Padding(
-                  padding: EdgeInsets.only(
-                    right: a.$4 < 4 ? 8 : 0,
-                  ),
+                  padding: EdgeInsets.only(right: a.$4 < 4 ? 8 : 0),
                   child: _actionButton(
-                    icon:  a.$1,
+                    icon: a.$1,
                     label: a.$2,
                     color: a.$3,
                     onTap: () => widget.onNavigate?.call(a.$4),
@@ -490,11 +519,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ── Bunk summary ──────────────────────────────────────────────────
 
   Widget _buildBunkSummary(AppState state) {
-    final safeBunks       = state.attendance.totalSafeBunks;
+    final safeBunks = state.attendance.totalSafeBunks;
     final classesToRecover = state.attendance.classesToRecover;
-    final overallPct      = state.attendance.overallPercentage;
-    final statusColor     = NBColors.statusColor(overallPct);
-    final isGood          = overallPct >= 75;
+    final overallPct = state.attendance.overallPercentage;
+    final statusColor = NBColors.statusColor(overallPct);
+    final isGood = overallPct >= 75;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
@@ -506,7 +535,11 @@ class _DashboardScreenState extends State<DashboardScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.calculate_rounded, color: NBColors.black, size: 20),
+                const Icon(
+                  Icons.calculate_rounded,
+                  color: NBColors.black,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'BUNK CALCULATOR',
@@ -519,10 +552,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    '$safeBunks',
-                    style: NBText.mono.copyWith(fontSize: 48),
-                  ),
+                  Text('$safeBunks', style: NBText.mono.copyWith(fontSize: 48)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Padding(

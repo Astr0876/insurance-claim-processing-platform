@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/theme/neubrut_tokens.dart';
@@ -6,6 +7,7 @@ import '../../core/widgets/nb_card.dart';
 import '../../core/widgets/nb_badge.dart';
 import '../../core/services/timetable_service.dart';
 import '../shared/widgets.dart';
+import 'import_review_screen.dart';
 
 class TimetableScreen extends StatefulWidget {
   const TimetableScreen({super.key});
@@ -17,7 +19,8 @@ class TimetableScreen extends StatefulWidget {
 class _TimetableScreenState extends State<TimetableScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final _days     = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  bool _isImporting = false;
+  final _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   final _fullDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
   // Accent colours per day (for visual variety)
@@ -75,6 +78,8 @@ class _TimetableScreenState extends State<TimetableScreen>
                           Expanded(
                             child: Text('Timetable', style: NBText.heading1),
                           ),
+                          _buildImportButton(state),
+                          const SizedBox(width: 8),
                           _buildAddButton(state),
                         ],
                       ),
@@ -93,7 +98,9 @@ class _TimetableScreenState extends State<TimetableScreen>
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 8),
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
                   child: Container(
                     height: 48,
                     decoration: BoxDecoration(
@@ -110,7 +117,7 @@ class _TimetableScreenState extends State<TimetableScreen>
                         color: NBColors.primary,
                         border: const Border(
                           right: BorderSide(color: NBColors.black, width: 1),
-                          left:  BorderSide(color: NBColors.black, width: 1),
+                          left: BorderSide(color: NBColors.black, width: 1),
                         ),
                         borderRadius: NBRadius.softAll,
                       ),
@@ -134,7 +141,9 @@ class _TimetableScreenState extends State<TimetableScreen>
                   animation: _tabController,
                   builder: (context, _) {
                     return _buildDaySchedule(
-                        state, _fullDays[_tabController.index]);
+                      state,
+                      _fullDays[_tabController.index],
+                    );
                   },
                 ),
               ),
@@ -163,8 +172,37 @@ class _TimetableScreenState extends State<TimetableScreen>
           children: [
             const Icon(Icons.add_rounded, color: NBColors.black, size: 18),
             const SizedBox(width: 4),
+            Text('ADD CLASS', style: NBText.label.copyWith(fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImportButton(AppState state) {
+    return GestureDetector(
+      onTap: _isImporting ? null : () => _pickAndImportTimetable(state),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: NBColors.blue,
+          border: Border.all(color: NBColors.black, width: 2),
+          borderRadius: NBRadius.softAll,
+          boxShadow: NBShadows.small,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _isImporting
+                  ? Icons.hourglass_top_rounded
+                  : Icons.upload_file_rounded,
+              color: NBColors.black,
+              size: 18,
+            ),
+            const SizedBox(width: 4),
             Text(
-              'ADD CLASS',
+              _isImporting ? 'IMPORTING' : 'IMPORT',
               style: NBText.label.copyWith(fontSize: 10),
             ),
           ],
@@ -174,8 +212,9 @@ class _TimetableScreenState extends State<TimetableScreen>
   }
 
   Widget _buildDaySchedule(AppState state, String day) {
-    final daySchedule =
-        state.timetable.schedule.where((s) => s.day == day).toList();
+    final daySchedule = state.timetable.schedule
+        .where((s) => s.day == day)
+        .toList();
 
     if (daySchedule.isEmpty || daySchedule.first.classes.isEmpty) {
       return Padding(
@@ -184,7 +223,11 @@ class _TimetableScreenState extends State<TimetableScreen>
           fillColor: NBColors.white,
           child: Column(
             children: [
-              const Icon(Icons.weekend_rounded, color: NBColors.black, size: 48),
+              const Icon(
+                Icons.weekend_rounded,
+                color: NBColors.black,
+                size: 48,
+              ),
               const SizedBox(height: 12),
               Text(
                 'No classes scheduled',
@@ -192,7 +235,9 @@ class _TimetableScreenState extends State<TimetableScreen>
               ),
               Text(
                 'Enjoy your free day!',
-                style: NBText.bodySmall.copyWith(color: const Color(0xFF666666)),
+                style: NBText.bodySmall.copyWith(
+                  color: const Color(0xFF666666),
+                ),
               ),
             ],
           ),
@@ -202,7 +247,7 @@ class _TimetableScreenState extends State<TimetableScreen>
 
     final classes = daySchedule.first.classes;
     final isToday = day == _getCurrentDay();
-    final dayIdx  = _fullDays.indexOf(day);
+    final dayIdx = _fullDays.indexOf(day);
     final dayColor = dayIdx >= 0 ? _dayColors[dayIdx] : NBColors.primary;
 
     return Padding(
@@ -222,7 +267,10 @@ class _TimetableScreenState extends State<TimetableScreen>
                   ),
                   Text(
                     'TODAY',
-                    style: NBText.label.copyWith(color: NBColors.green, letterSpacing: 2),
+                    style: NBText.label.copyWith(
+                      color: NBColors.green,
+                      letterSpacing: 2,
+                    ),
                   ),
                 ],
               ),
@@ -249,8 +297,13 @@ class _TimetableScreenState extends State<TimetableScreen>
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 5),
                 child: _buildClassCard(
-                  cls.subject, cls.time, cls.room,
-                  cls.durationMinutes, pct, state, dayColor,
+                  cls.subject,
+                  cls.time,
+                  cls.room,
+                  cls.durationMinutes,
+                  pct,
+                  state,
+                  dayColor,
                 ),
               ),
             );
@@ -261,8 +314,13 @@ class _TimetableScreenState extends State<TimetableScreen>
   }
 
   Widget _buildClassCard(
-    String subject, String time, String room,
-    int duration, double attendance, AppState state, Color accentColor,
+    String subject,
+    String time,
+    String room,
+    int duration,
+    double attendance,
+    AppState state,
+    Color accentColor,
   ) {
     final statusColor = NBColors.statusColor(attendance);
     return NBCard(
@@ -305,11 +363,17 @@ class _TimetableScreenState extends State<TimetableScreen>
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _miniBtn(Icons.check_rounded, NBColors.green,
-                      () => state.markAttended(subject)),
+                  _miniBtn(
+                    Icons.check_rounded,
+                    NBColors.green,
+                    () => state.markAttended(subject),
+                  ),
                   const SizedBox(width: 4),
-                  _miniBtn(Icons.close_rounded, NBColors.danger,
-                      () => state.markAbsent(subject)),
+                  _miniBtn(
+                    Icons.close_rounded,
+                    NBColors.danger,
+                    () => state.markAbsent(subject),
+                  ),
                 ],
               ),
             ],
@@ -350,16 +414,21 @@ class _TimetableScreenState extends State<TimetableScreen>
 
   String _getCurrentDay() {
     const days = [
-      'Monday', 'Tuesday', 'Wednesday',
-      'Thursday', 'Friday', 'Saturday', 'Sunday'
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
     ];
     return days[DateTime.now().weekday - 1];
   }
 
   void _showAddClassDialog(AppState state) {
     final subjectCtrl = TextEditingController();
-    final timeCtrl    = TextEditingController();
-    final roomCtrl    = TextEditingController();
+    final timeCtrl = TextEditingController();
+    final roomCtrl = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -372,7 +441,11 @@ class _TimetableScreenState extends State<TimetableScreen>
       builder: (context) {
         return Padding(
           padding: EdgeInsets.fromLTRB(
-              20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+            20,
+            20,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -402,7 +475,10 @@ class _TimetableScreenState extends State<TimetableScreen>
                 style: NBText.body,
                 decoration: const InputDecoration(
                   hintText: 'Time (e.g. 9:00 AM)',
-                  prefixIcon: Icon(Icons.access_time_rounded, color: NBColors.black),
+                  prefixIcon: Icon(
+                    Icons.access_time_rounded,
+                    color: NBColors.black,
+                  ),
                 ),
               ),
               const SizedBox(height: NBSpacing.md),
@@ -419,7 +495,7 @@ class _TimetableScreenState extends State<TimetableScreen>
               GestureDetector(
                 onTap: () {
                   if (subjectCtrl.text.isNotEmpty) {
-                    state.timetable.addManualEntry(
+                    state.addManualClass(
                       _fullDays[_tabController.index],
                       TimetableEntry(
                         subject: subjectCtrl.text,
@@ -428,8 +504,6 @@ class _TimetableScreenState extends State<TimetableScreen>
                         durationMinutes: 60,
                       ),
                     );
-                    state.attendance.addSubject(subjectCtrl.text);
-                    state.refresh();
                     Navigator.pop(context);
                   }
                 },
@@ -445,11 +519,101 @@ class _TimetableScreenState extends State<TimetableScreen>
                   child: Center(
                     child: Text(
                       'ADD CLASS',
-                      style: NBText.label.copyWith(fontSize: 13, letterSpacing: 2),
+                      style: NBText.label.copyWith(
+                        fontSize: 13,
+                        letterSpacing: 2,
+                      ),
                     ),
                   ),
                 ),
               ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndImportTimetable(AppState state) async {
+    setState(() => _isImporting = true);
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['pdf', 'png', 'jpg', 'jpeg'],
+      );
+      if (result == null ||
+          result.files.isEmpty ||
+          result.files.single.path == null) {
+        return;
+      }
+
+      final file = result.files.single;
+      final ext = file.extension?.toLowerCase();
+      final importType = ext == 'pdf'
+          ? TimetableImportType.pdf
+          : TimetableImportType.image;
+
+      final importResult = await state.importTimetableFile(
+        filePath: file.path!,
+        type: importType,
+      );
+
+      if (!mounted) return;
+      if (!importResult.isSuccess) {
+        _showImportFailure(importResult);
+        return;
+      }
+
+      final reviewed = await Navigator.of(context).push<List<ParsedClassSlot>>(
+        MaterialPageRoute(
+          builder: (_) => TimetableImportReviewScreen(
+            initialSlots: importResult.slots,
+            issues: importResult.issues,
+            rawText: importResult.rawText,
+          ),
+        ),
+      );
+
+      if (!mounted || reviewed == null || reviewed.isEmpty) return;
+      state.applyImportedTimetable(reviewed);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Imported ${reviewed.length} class slots.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isImporting = false);
+    }
+  }
+
+  void _showImportFailure(TimetableImportResult result) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: NBColors.bg,
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Import Failed', style: NBText.heading3),
+              const SizedBox(height: 8),
+              Text(result.errorMessage ?? 'Unknown error', style: NBText.body),
+              if (result.issues.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Parser issues: ${result.issues.length}',
+                  style: NBText.label,
+                ),
+              ],
+              if (result.rawText.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  result.rawText.length > 500
+                      ? '${result.rawText.substring(0, 500)}...'
+                      : result.rawText,
+                  style: NBText.bodySmall,
+                ),
+              ],
             ],
           ),
         );

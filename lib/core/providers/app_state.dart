@@ -3,15 +3,38 @@ import '../services/attendance_service.dart';
 import '../services/focus_service.dart';
 import '../services/timetable_service.dart';
 import '../services/assistant_service.dart';
+import '../services/kanban_service.dart';
+
+class HomeWidgetSnapshot {
+  final String nextClassLabel;
+  final String nextClassTime;
+  final double attendancePercentage;
+  final String riskLabel;
+
+  const HomeWidgetSnapshot({
+    required this.nextClassLabel,
+    required this.nextClassTime,
+    required this.attendancePercentage,
+    required this.riskLabel,
+  });
+}
 
 class AppState extends ChangeNotifier {
   final AttendanceService attendance = AttendanceService();
   final FocusService focus = FocusService();
   final TimetableService timetable = TimetableService();
   final AssistantService assistant = AssistantService();
+  final KanbanService kanban = KanbanService();
 
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
+  HomeWidgetSnapshot _widgetSnapshot = const HomeWidgetSnapshot(
+    nextClassLabel: 'No class',
+    nextClassTime: '--',
+    attendancePercentage: 100,
+    riskLabel: 'LOW',
+  );
+  HomeWidgetSnapshot get widgetSnapshot => _widgetSnapshot;
 
   // Student name for personalization
   String _studentName = 'Student';
@@ -30,6 +53,8 @@ class AppState extends ChangeNotifier {
     attendance.loadDemoData();
     focus.loadDemoData();
     assistant.loadDemoDocument();
+    _refreshWidgetSnapshot();
+    kanban.loadDemoData();
 
     _isInitialized = true;
     notifyListeners();
@@ -38,11 +63,34 @@ class AppState extends ChangeNotifier {
   // Attendance actions
   void markAttended(String subject) {
     attendance.markAttended(subject);
+    _refreshWidgetSnapshot();
     notifyListeners();
   }
 
   void markAbsent(String subject) {
     attendance.markAbsent(subject);
+    _refreshWidgetSnapshot();
+    notifyListeners();
+  }
+
+  Future<TimetableImportResult> importTimetableFile({
+    required String filePath,
+    required TimetableImportType type,
+  }) {
+    return timetable.importTimetableFile(filePath: filePath, type: type);
+  }
+
+  void applyImportedTimetable(List<ParsedClassSlot> slots) {
+    timetable.applyImportedSchedule(slots);
+    attendance.syncSubjects(timetable.subjects);
+    _refreshWidgetSnapshot();
+    notifyListeners();
+  }
+
+  void addManualClass(String day, TimetableEntry entry) {
+    timetable.addManualEntry(day, entry);
+    attendance.addSubject(entry.subject);
+    _refreshWidgetSnapshot();
     notifyListeners();
   }
 
@@ -98,6 +146,24 @@ class AppState extends ChangeNotifier {
   }
 
   void refresh() {
+    _refreshWidgetSnapshot();
     notifyListeners();
+  }
+
+  void _refreshWidgetSnapshot() {
+    final nextClass = timetable.getNextClass();
+    final attendancePct = attendance.overallPercentage;
+    final risk = attendancePct < 60
+        ? 'HIGH'
+        : attendancePct < 75
+        ? 'MEDIUM'
+        : 'LOW';
+
+    _widgetSnapshot = HomeWidgetSnapshot(
+      nextClassLabel: nextClass?.subject ?? 'No class',
+      nextClassTime: nextClass?.time ?? '--',
+      attendancePercentage: attendancePct,
+      riskLabel: risk,
+    );
   }
 }
