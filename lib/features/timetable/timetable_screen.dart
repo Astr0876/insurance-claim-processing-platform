@@ -578,34 +578,63 @@ class _TimetableScreenState extends State<TimetableScreen>
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: NBColors.bg,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(NBRadius.max)),
+        side: BorderSide(color: NBColors.black, width: 2),
+      ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Import Failed', style: NBText.heading3),
-              const SizedBox(height: 8),
-              Text(result.errorMessage ?? 'Unknown error', style: NBText.body),
-              if (result.issues.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text(
-                  'Parser issues: ${result.issues.length}',
-                  style: NBText.label,
-                ),
-              ],
-              if (result.rawText.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text(
-                  result.rawText.length > 500
-                      ? '${result.rawText.substring(0, 500)}...'
-                      : result.rawText,
-                  style: NBText.bodySmall,
-                ),
-              ],
-            ],
-          ),
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      color: NBColors.black,
+                      margin: const EdgeInsets.only(bottom: 16),
+                    ),
+                  ),
+                  Text('Import Failed', style: NBText.heading2),
+                  const SizedBox(height: 12),
+                  Text(
+                    result.errorMessage ?? 'No class slots could be parsed from extracted text.',
+                    style: NBText.body.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  if (result.issues.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'Parser issues: ${result.issues.length}',
+                      style: NBText.label,
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: NBColors.white,
+                        border: Border.all(color: NBColors.black, width: 1.5),
+                        borderRadius: NBRadius.softAll,
+                      ),
+                      child: Text(
+                        result.rawText,
+                        style: NBText.bodySmall.copyWith(fontFamily: 'RobotoMono'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
         );
       },
     );

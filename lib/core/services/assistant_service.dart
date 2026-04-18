@@ -30,6 +30,8 @@ class AssistantService extends ChangeNotifier {
   bool _isModelDownloaded = false;
   bool _isModelLoaded = false;
   double _downloadProgress = 0;
+  double _indexingProgress = 0;
+  bool _isIndexing = false;
   String _statusMessage = 'Lumina is offline';
 
   // Privacy Guard: Ensures zero network activity during RAG
@@ -44,6 +46,8 @@ class AssistantService extends ChangeNotifier {
   bool get isModelDownloaded => _isModelDownloaded;
   bool get isModelLoaded => _isModelLoaded;
   double get downloadProgress => _downloadProgress;
+  double get indexingProgress => _indexingProgress;
+  bool get isIndexing => _isIndexing;
   String get statusMessage => _statusMessage;
 
   void setMode(AssistantMode newMode) {
@@ -65,7 +69,7 @@ class AssistantService extends ChangeNotifier {
       _downloadProgress = i / 10;
       _statusMessage = 'Downloading Model: ${i * 10}%';
       notifyListeners();
-      await Future.delayed(const Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 150));
     }
     _isModelDownloaded = true;
     _isModelLoaded = true;
@@ -93,9 +97,25 @@ class AssistantService extends ChangeNotifier {
       debugPrint("[Power Saving] Indexing skipped: Battery Guardian Active.");
       return;
     }
-    debugPrint("[Privacy Guard] Indexing document locally...");
+    
+    _isIndexing = true;
+    _indexingProgress = 0;
+    _statusMessage = 'Indexing locally...';
+    notifyListeners();
+
+    // Simulate multi-step indexing
+    for (int i = 1; i <= 5; i++) {
+      _indexingProgress = i / 5;
+      await Future.delayed(const Duration(milliseconds: 400));
+      notifyListeners();
+    }
+
+    debugPrint("[Privacy Guard] Indexing document locally complete.");
     _documentContent = content;
     _hasDocument = true;
+    _isIndexing = false;
+    _indexingProgress = 1.0;
+    _statusMessage = 'Lumina is Ready (Local)';
     notifyListeners();
   }
 
@@ -113,7 +133,7 @@ class AssistantService extends ChangeNotifier {
 
   Stream<String> getAnswerStream(String query) async* {
     if (_mode == AssistantMode.standard) {
-      yield getAnswer(query);
+      yield await askQuestion(query);
       return;
     }
 
@@ -130,35 +150,35 @@ class AssistantService extends ChangeNotifier {
     await Future.delayed(const Duration(milliseconds: 600));
 
     final results = _internalSearch(query);
-    if (results.isEmpty) {
-      yield "I've searched your notes locally but couldn't find a direct match. Try rephrasing!";
-      return;
-    }
-
+    
     // Synthesis Logic: Synthesize an answer from snippets
     yield "✨ [Synthesis] Generating offline answer...\n\n";
     await Future.delayed(const Duration(milliseconds: 600));
 
     final synthesis = _synthesizeAnswer(query, results);
     final words = synthesis.split(' ');
-    String current = "";
     for (var w in words) {
       await Future.delayed(const Duration(milliseconds: 15));
-      current += "$w ";
-      yield current;
+      yield "$w ";
     }
   }
 
   String _synthesizeAnswer(String query, List<SearchResult> results) {
-    if (results.isEmpty) return "I couldn't find anything in your document.";
+    final lowerQuery = query.toLowerCase();
+
+    // General conversational fallback
+    if (results.isEmpty) {
+      if (lowerQuery.contains('hi') || lowerQuery.contains('hello')) {
+        return "Hello Renee! I'm your local assistant. I couldn't find specific matches in your notes for this, but I'm ready to help with your study materials. Try asking about a topic from your uploaded PDFs!";
+      }
+      return "I've searched your notes locally but couldn't find a direct match for \"$query\". Try rephrasing or uploading more relevant materials!";
+    }
     
     final context = results.map((r) => r.snippet).join(' ');
-    final lowerQuery = query.toLowerCase();
     
     // Simple synthesis rule: if it's a "what is" question, structure it as a definition
-    if (lowerQuery.contains('what is') || lowerQuery.contains('define')) {
-      final subject = lowerQuery.split(' ').last.replaceAll('?', '');
-      return "Based on your local document, $subject can be defined through the following context: $context\n\nThis information is retrieved entirely from your offline storage.";
+    if (lowerQuery.contains('what is') || lowerQuery.contains('define') || lowerQuery.contains('features')) {
+      return "Based on your local document, here's a synthesis regarding \"$query\":\n\n${results.first.snippet.replaceAll('...', '').trim()}\n\nThis information is retrieved entirely from your offline storage.";
     }
     
     // Generic synthesis
@@ -168,16 +188,20 @@ class AssistantService extends ChangeNotifier {
            "Additionally, your notes mention: ${results.length > 1 ? results[1].snippet.replaceAll('...', '').trim() : 'no other details'}.";
   }
 
-  String getAnswer(String query) {
+  Future<String> askQuestion(String query) async {
+    final lowerQuery = query.toLowerCase();
     final results = _internalSearch(query);
-    if (results.isEmpty) return "No results found in your notes.";
+
+    if (results.isEmpty) {
+      if (lowerQuery.contains('hi') || lowerQuery.contains('hello')) {
+        return "Hello Renee! How can I help with your studies today?";
+      }
+      return "No results found in your notes for \"$query\".";
+    }
+
     final buffer = StringBuffer()..writeln("Notes Reference:\n");
     for (var res in results) buffer.writeln(res.snippet);
     return buffer.toString().trim();
-  }
-
-  Future<String> askQuestion(String query) async {
-    return getAnswer(query);
   }
 
   List<SearchResult> _internalSearch(String query) {

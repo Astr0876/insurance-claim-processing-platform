@@ -4,7 +4,6 @@ import '../../core/providers/app_state.dart';
 import '../../core/theme/neubrut_tokens.dart';
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
-import '../shared/widgets.dart';
 import '../../core/services/assistant_service.dart';
 
 class ChatMessage {
@@ -49,17 +48,57 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
     _scrollToBottom();
 
-    // Simulate response
     final state = Provider.of<AppState>(context, listen: false);
-    state.assistant.askQuestion(text).then((response) {
-      if (mounted) {
-        setState(() {
-          _isTyping = false;
-          _messages.add(ChatMessage(text: response, isUser: false));
-        });
-        _scrollToBottom();
-      }
-    });
+    final assistant = state.assistant;
+
+    if (assistant.mode == AssistantMode.luminaRag) {
+      // RAG Streaming mode
+      setState(() {
+        _isTyping = false;
+        _messages.add(ChatMessage(text: "", isUser: false, isStreaming: true));
+      });
+      
+      final currentMessageIndex = _messages.length - 1;
+      String accumulatedText = "";
+      
+      assistant.getAnswerStream(text).listen(
+        (chunk) {
+          if (mounted) {
+            accumulatedText += chunk;
+            setState(() {
+              _messages[currentMessageIndex] = ChatMessage(
+                text: accumulatedText, 
+                isUser: false, 
+                isStreaming: true,
+              );
+            });
+            _scrollToBottom();
+          }
+        },
+        onDone: () {
+          if (mounted) {
+            setState(() {
+              _messages[currentMessageIndex] = ChatMessage(
+                text: accumulatedText,
+                isUser: false,
+                isStreaming: false,
+              );
+            });
+          }
+        },
+      );
+    } else {
+      // Standard mode
+      assistant.askQuestion(text).then((response) {
+        if (mounted) {
+          setState(() {
+            _isTyping = false;
+            _messages.add(ChatMessage(text: response, isUser: false));
+          });
+          _scrollToBottom();
+        }
+      });
+    }
   }
 
   void _scrollToBottom() {
@@ -184,25 +223,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
                           if (result != null && result.files.single.path != null) {
                             final fileName = result.files.single.name;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Indexing $fileName into Local Brain...'),
-                                backgroundColor: Colors.purple,
-                              ),
-                            );
-                            
-                            // In a real app, read the file bytes/text
-                            await Future.delayed(const Duration(seconds: 2));
                             await assistant.indexDocument("Content from $fileName: Indexed for RAG.");
-                            
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('$fileName Indexed! ✨'),
-                                  backgroundColor: NBColors.green,
-                                ),
-                              );
-                            }
                           }
                         } catch (e) {
                           if (mounted) {
@@ -229,7 +250,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     ),
                   ],
                 ),
-                if (assistant.mode == AssistantMode.luminaRag && !assistant.isModelLoaded)
+                if (assistant.mode == AssistantMode.luminaRag && (!assistant.isModelLoaded || assistant.isIndexing))
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: Column(
@@ -237,26 +258,38 @@ class _AssistantScreenState extends State<AssistantScreen> {
                         ClipRRect(
                           borderRadius: NBRadius.softAll,
                           child: LinearProgressIndicator(
-                            value: assistant.downloadProgress > 0 ? assistant.downloadProgress : null,
+                            value: assistant.isIndexing 
+                                ? assistant.indexingProgress 
+                                : (assistant.downloadProgress > 0 ? assistant.downloadProgress : null),
                             backgroundColor: Colors.white,
                             color: Colors.purple,
-                            minHeight: 8,
+                            minHeight: 12,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        if (!assistant.isModelDownloaded)
-                          GestureDetector(
-                            onTap: () => assistant.downloadLumina(),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.purple,
-                                border: Border.all(color: NBColors.black, width: 1.5),
-                                borderRadius: NBRadius.softAll,
-                              ),
-                              child: Text(
-                                'START DOWNLOAD (500MB)',
-                                style: NBText.label.copyWith(color: Colors.white, fontSize: 10),
+                        const SizedBox(height: 6),
+                        Text(
+                          assistant.isIndexing 
+                              ? 'INDEXING NOTES: ${(assistant.indexingProgress * 100).toInt()}%'
+                              : 'AI MODEL PROGRESS',
+                          style: NBText.label.copyWith(fontSize: 10),
+                        ),
+                        if (!assistant.isModelDownloaded && !assistant.isIndexing)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: GestureDetector(
+                              onTap: () => assistant.downloadLumina(),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple,
+                                  border: Border.all(color: NBColors.black, width: 2),
+                                  borderRadius: NBRadius.softAll,
+                                  boxShadow: NBShadows.small,
+                                ),
+                                child: Text(
+                                  'ACTIVATE OFFLINE BRAIN (500MB)',
+                                  style: NBText.label.copyWith(color: Colors.white, fontSize: 10),
+                                ),
                               ),
                             ),
                           ),

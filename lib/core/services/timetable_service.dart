@@ -266,14 +266,28 @@ class TimetableTextParser {
     final lines = rawText.split(RegExp(r'[\r\n]+'));
     final slots = <ParsedClassSlot>[];
     final issues = <ParseIssue>[];
+    String? currentDay;
 
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i].trim();
       if (line.isEmpty) continue;
 
-      final parsed = _parseLine(line);
+      // Check if the line is just a day header (e.g., "Monday:")
+      final dayHeaderMatch = RegExp(
+        r'^\b(mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?)\b[:\-]?$',
+        caseSensitive: false,
+      ).firstMatch(line);
+      
+      if (dayHeaderMatch != null) {
+        currentDay = _normalizeDay(dayHeaderMatch.group(1)!);
+        continue;
+      }
+
+      final parsed = _parseLine(line, overrideDay: currentDay);
       if (parsed != null) {
         slots.add(parsed);
+        // If the line contained a day, update currentDay for subsequent lines
+        currentDay = parsed.day;
         continue;
       }
 
@@ -281,7 +295,7 @@ class TimetableTextParser {
         issues.add(
           ParseIssue(
             lineNumber: i + 1,
-            message: 'Could not fully parse this line.',
+            message: 'Could not fully parse this line. Current Day Context: ${currentDay ?? "None"}',
             rawLine: line,
           ),
         );
@@ -291,14 +305,16 @@ class TimetableTextParser {
     return TimetableParseResult(slots: slots, issues: issues);
   }
 
-  ParsedClassSlot? _parseLine(String line) {
+  ParsedClassSlot? _parseLine(String line, {String? overrideDay}) {
     final dayMatch = RegExp(
       r'\b(mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?)\b',
       caseSensitive: false,
     ).firstMatch(line);
-    if (dayMatch == null) return null;
-
-    final day = _normalizeDay(dayMatch.group(1)!);
+    
+    final day = (dayMatch != null) 
+        ? _normalizeDay(dayMatch.group(1)!) 
+        : overrideDay;
+        
     if (day == null) return null;
 
     final timeMatch = RegExp(
@@ -312,7 +328,9 @@ class TimetableTextParser {
     if (startTime == null || endTime == null) return null;
 
     var remainder = line;
-    remainder = remainder.replaceFirst(dayMatch.group(0)!, '');
+    if (dayMatch != null) {
+      remainder = remainder.replaceFirst(dayMatch.group(0)!, '');
+    }
     remainder = remainder.replaceFirst(timeMatch.group(0)!, '');
     remainder = remainder.replaceAll(RegExp(r'^[\s|,;:-]+|[\s|,;:-]+$'), '');
     remainder = remainder.replaceAll(RegExp(r'\s+'), ' ');

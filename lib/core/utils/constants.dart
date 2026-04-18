@@ -2,6 +2,9 @@ class AppConstants {
   static const String appName = 'LUMINA';
   static const String appTagline = 'Your Proactive Student Sidekick';
   static const double attendanceThreshold = 75.0;
+
+  static const String supabaseUrl = 'https://kphcmodgjpvloeclzeyr.supabase.co';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwaGNtb2RnanB2bG9lY2x6ZXlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MjE1MDUsImV4cCI6MjA5MjA5NzUwNX0.nh-BX2BPNWT7022ofN3an1lcFYZGSUjBJjvRi4Jtxcs';
   
   // Demo timetable data
   static const List<Map<String, dynamic>> demoTimetable = [

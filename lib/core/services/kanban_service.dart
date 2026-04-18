@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kanban_board/kanban_board.dart';
 
 enum KanbanStatus { todo, doing, done }
+
+extension KanbanStatusExtension on KanbanStatus {
+  String toShortString() => toString().split('.').last;
+  static KanbanStatus fromString(String status) {
+    return KanbanStatus.values.firstWhere(
+      (e) => e.toShortString() == status,
+      orElse: () => KanbanStatus.todo,
+    );
+  }
+}
 
 class KanbanTask extends KanbanBoardGroupItem {
   final String taskId;
@@ -28,6 +38,31 @@ class KanbanTask extends KanbanBoardGroupItem {
   @override
   String get id => taskId;
 
+  factory KanbanTask.fromSupabase(Map<String, dynamic> map) {
+    return KanbanTask(
+      taskId: map['id'],
+      title: map['title'],
+      description: map['description'] ?? '',
+      assignee: map['assignee'] ?? '',
+      assigneeAvatar: map['assignee_avatar'] ?? '',
+      status: KanbanStatusExtension.fromString(map['status']),
+      createdAt: DateTime.parse(map['created_at']),
+      dueDate: map['due_date'] != null ? DateTime.parse(map['due_date']) : null,
+    );
+  }
+
+  Map<String, dynamic> toSupabase(String userId) {
+    return {
+      'user_id': userId,
+      'title': title,
+      'description': description,
+      'assignee': assignee,
+      'assignee_avatar': assigneeAvatar,
+      'status': status.toShortString(),
+      'due_date': dueDate?.toIso8601String(),
+    };
+  }
+
   KanbanTask copyWith({
     String? title,
     String? description,
@@ -50,122 +85,114 @@ class KanbanTask extends KanbanBoardGroupItem {
 }
 
 class KanbanService extends ChangeNotifier {
-  final _uuid = const Uuid();
+  final _supabase = Supabase.instance.client;
   List<KanbanTask> _tasks = [];
+  bool _isLoading = false;
 
   List<KanbanTask> get tasks => _tasks;
+  bool get isLoading => _isLoading;
 
   List<KanbanTask> get todoTasks => _tasks.where((t) => t.status == KanbanStatus.todo).toList();
   List<KanbanTask> get doingTasks => _tasks.where((t) => t.status == KanbanStatus.doing).toList();
   List<KanbanTask> get doneTasks => _tasks.where((t) => t.status == KanbanStatus.done).toList();
 
-  void loadDemoData() {
-    final now = DateTime.now();
-    _tasks = [
-      KanbanTask(
-        taskId: _uuid.v4(),
-        title: 'Draft Project Proposal',
-        description: 'Create the initial draft for the CS301 project.',
-        assignee: 'Renee',
-        assigneeAvatar: 'R',
-        status: KanbanStatus.doing,
-        createdAt: now.subtract(const Duration(days: 2)),
-        dueDate: now.add(const Duration(days: 1)),
-      ),
-      KanbanTask(
-        taskId: _uuid.v4(),
-        title: 'Research UI Patterns',
-        description: 'Look into neubrutalism design patterns for the app.',
-        assignee: 'Alex',
-        assigneeAvatar: 'A',
-        status: KanbanStatus.todo,
-        createdAt: now.subtract(const Duration(days: 1)),
-        dueDate: now.add(const Duration(days: 3)),
-      ),
-      KanbanTask(
-        taskId: _uuid.v4(),
-        title: 'Database Schema Design',
-        description: 'Define the ER diagram and tables.',
-        assignee: 'Jordan',
-        assigneeAvatar: 'J',
-        status: KanbanStatus.todo,
-        createdAt: now.subtract(const Duration(hours: 5)),
-        dueDate: now.add(const Duration(days: 2)),
-      ),
-      KanbanTask(
-        taskId: _uuid.v4(),
-        title: 'Finalize Tech Stack',
-        description: 'Choose between Flutter and React Native.',
-        assignee: 'Renee',
-        assigneeAvatar: 'R',
-        status: KanbanStatus.done,
-        createdAt: now.subtract(const Duration(days: 5)),
-        dueDate: now.subtract(const Duration(days: 1)),
-      ),
-    ];
+  Future<void> fetchTasks() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    _isLoading = true;
     notifyListeners();
+
+    try {
+      final response = await _supabase
+          .from('kanban_tasks')
+          .select()
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
+
+      _tasks = (response as List).map((t) => KanbanTask.fromSupabase(t)).toList();
+    } catch (e) {
+      debugPrint('Error fetching tasks: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  void addTask({
+  void loadDemoData() {
+    // Demo data logic can be kept for fallback or removed
+    // For now, we'll just call fetchTasks if user is logged in
+    fetchTasks();
+  }
+
+  Future<void> addTask({
     required String title,
     required String description,
     required String assignee,
     required String avatar,
     KanbanStatus status = KanbanStatus.todo,
     DateTime? dueDate,
-  }) {
-    final newTask = KanbanTask(
-      taskId: _uuid.v4(),
-      title: title,
-      description: description,
-      assignee: assignee,
-      assigneeAvatar: avatar,
-      status: status,
-      createdAt: DateTime.now(),
-      dueDate: dueDate,
-    );
-    _tasks.add(newTask);
-    notifyListeners();
+  }) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    final newTask = {
+      'user_id': user.id,
+      'title': title,
+      'description': description,
+      'assignee': assignee,
+      'assignee_avatar': avatar,
+      'status': status.toShortString(),
+      'due_date': dueDate?.toIso8601String(),
+    };
+
+    try {
+      final response = await _supabase.from('kanban_tasks').insert(newTask).select().single();
+      _tasks.insert(0, KanbanTask.fromSupabase(response));
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error adding task: $e');
+    }
   }
 
-  /// Triggers a final sync before power saving mode kicks in.
   Future<void> finalSync() async {
-    debugPrint('BATTERY GUARDIAN: Triggering Final Kanban Sync...');
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
+    debugPrint('BATTERY GUARDIAN: Triggering Kanban Sync...');
+    await fetchTasks();
     debugPrint('BATTERY GUARDIAN: Kanban Sync Complete.');
   }
 
-  void updateTaskStatus(String taskId, KanbanStatus newStatus, {bool isRemote = false}) {
+  Future<void> updateTaskStatus(String taskId, KanbanStatus newStatus, {bool isRemote = false}) async {
     final index = _tasks.indexWhere((t) => t.id == taskId);
     if (index != -1) {
       final oldTask = _tasks[index];
       if (oldTask.status == newStatus) return;
 
-      _tasks[index] = oldTask.copyWith(status: newStatus);
-      
-      // If it was a local move, we "broadcast" it to the Progress Engine
-      if (!isRemote) {
-        _broadcastToProgressEngine(taskId, newStatus);
+      try {
+        await _supabase
+            .from('kanban_tasks')
+            .update({'status': newStatus.toShortString()})
+            .eq('id', taskId);
+
+        _tasks[index] = oldTask.copyWith(status: newStatus);
+        
+        if (!isRemote) {
+          debugPrint('PROGRESS ENGINE: Task $taskId moved to $newStatus');
+        }
+        
+        notifyListeners();
+      } catch (e) {
+        debugPrint('Error updating task status: $e');
       }
-      
-      notifyListeners();
     }
   }
 
-  void _broadcastToProgressEngine(String taskId, KanbanStatus status) {
-    // In a real app, this would send a socket event or HTTP request.
-    // For testing/demo, we'll just log it.
-    debugPrint('PROGRESS ENGINE: Task $taskId moved to $status');
-  }
-
-  /// Simulates a task being moved by another user (Global Reflection)
-  void simulateRemoteMove(String taskId, KanbanStatus newStatus) {
-    updateTaskStatus(taskId, newStatus, isRemote: true);
-  }
-
-  void deleteTask(String taskId) {
-    _tasks.removeWhere((t) => t.id == taskId);
-    notifyListeners();
+  Future<void> deleteTask(String taskId) async {
+    try {
+      await _supabase.from('kanban_tasks').delete().eq('id', taskId);
+      _tasks.removeWhere((t) => t.id == taskId);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error deleting task: $e');
+    }
   }
 }

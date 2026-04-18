@@ -63,7 +63,7 @@ void main() {
       
       // Verify it synthesized an answer (not just a raw snippet list)
       expect(output, contains('Based on your local document'));
-      expect(output, contains('can be defined through the following context'));
+      expect(output, contains("here's a synthesis regarding"));
     });
 
     test('Verify Privacy Guard: No network requests should be triggered', () {

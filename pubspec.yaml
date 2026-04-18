@@ -46,6 +46,7 @@ dependencies:
   kanban_board: ^1.0.0+2
   uuid: ^4.5.1
   home_widget: ^0.9.1
+  supabase_flutter: ^2.12.4
 
 dev_dependencies:
   flutter_test:
