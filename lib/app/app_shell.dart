@@ -383,7 +383,7 @@ class _RunAnywhereDialogState extends State<RunAnywhereDialog> {
                 _buildActionButton(
                   icon: Icons.mic_rounded,
                   label: 'LISTEN',
-                  color: NBColors.accent,
+                  color: NBColors.blue,
                   onPressed: () async {
                     setState(() => _isLoading = true);
                     final res = await aiModels.listen();

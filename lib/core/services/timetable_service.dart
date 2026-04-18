@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../utils/constants.dart';
+import 'gradio_service.dart';
 
 enum TimetableImportType { pdf, image }
 
@@ -141,76 +141,6 @@ class TimetableImportResult {
       slots: const [],
       issues: issues,
       errorMessage: message,
-    );
-  }
-}
-
-class _TextExtractionResult {
-  final bool success;
-  final String rawText;
-  final String? errorMessage;
-
-  const _TextExtractionResult._({
-    required this.success,
-    required this.rawText,
-    this.errorMessage,
-  });
-
-  factory _TextExtractionResult.success(String rawText) {
-    return _TextExtractionResult._(success: true, rawText: rawText);
-  }
-
-  factory _TextExtractionResult.failure(String message, {String rawText = ''}) {
-    return _TextExtractionResult._(
-      success: false,
-      rawText: rawText,
-      errorMessage: message,
-    );
-  }
-}
-
-abstract class _TimetableTextExtractionAdapter {
-  Future<_TextExtractionResult> extract(String filePath);
-}
-
-class _PdfTextExtractionAdapter implements _TimetableTextExtractionAdapter {
-  @override
-  Future<_TextExtractionResult> extract(String filePath) async {
-    try {
-      final file = File(filePath);
-      if (!await file.exists()) {
-        return _TextExtractionResult.failure(
-          'Selected file could not be found.',
-        );
-      }
-
-      final bytes = await file.readAsBytes();
-      final document = PdfDocument(inputBytes: bytes);
-      final extractor = PdfTextExtractor(document);
-      final rawText = extractor.extractText();
-      document.dispose();
-
-      if (rawText.trim().isEmpty) {
-        return _TextExtractionResult.failure(
-          'No readable text found in the PDF.',
-          rawText: rawText,
-        );
-      }
-
-      return _TextExtractionResult.success(rawText);
-    } catch (e) {
-      return _TextExtractionResult.failure('PDF extraction failed: $e');
-    }
-  }
-}
-
-class _ImageTextExtractionAdapter implements _TimetableTextExtractionAdapter {
-  @override
-  Future<_TextExtractionResult> extract(String filePath) async {
-    // Image-based OCR implementation is currently not available.
-    // In a real app, this would use a package like google_mlkit_text_recognition.
-    return _TextExtractionResult.failure(
-      'Image OCR extraction is not yet implemented. Please import using a PDF file.',
     );
   }
 }
@@ -405,8 +335,7 @@ class TimetableTextParser {
 class TimetableService extends ChangeNotifier {
   static const List<String> weekdays = TimetableTextParser.weekdays;
   final TimetableTextParser parser;
-  final _pdfAdapter = _PdfTextExtractionAdapter();
-  final _imageAdapter = _ImageTextExtractionAdapter();
+  final GradioService _gradioService = GradioService();
 
   List<DaySchedule> _schedule = [];
   bool _isLoaded = false;
@@ -470,39 +399,78 @@ class TimetableService extends ChangeNotifier {
     required String filePath,
     required TimetableImportType type,
   }) async {
-    final adapter = type == TimetableImportType.pdf
-        ? _pdfAdapter
-        : _imageAdapter;
-    final extraction = await adapter.extract(filePath);
-    _lastRawExtractedText = extraction.rawText;
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) {
+        return TimetableImportResult.failure(
+          filePath: filePath,
+          sourceType: type,
+          message: 'Selected file could not be found.',
+        );
+      }
 
-    if (!extraction.success) {
-      return TimetableImportResult.failure(
+      // Step 1: Upload to Gradio
+      final remotePath = await _gradioService.uploadFile(file);
+      if (remotePath == null) {
+        return TimetableImportResult.failure(
+          filePath: filePath,
+          sourceType: type,
+          message: 'Failed to upload file to AI service.',
+        );
+      }
+
+      // Step 2: Call process_timetable
+      final result = await _gradioService.callEndpoint('process_timetable', [
+        {'path': remotePath}
+      ]);
+
+      if (result == null || result is! List || result.isEmpty) {
+        return TimetableImportResult.failure(
+          filePath: filePath,
+          sourceType: type,
+          message: 'AI service did not return a valid result.',
+        );
+      }
+
+      // Gradio result is [ { "subjects": [...], "raw_text": "..." } ]
+      final data = result[0] as Map<String, dynamic>;
+      final rawText = data['raw_text'] as String? ?? '';
+      _lastRawExtractedText = rawText;
+
+      if (rawText.isEmpty) {
+        return TimetableImportResult.failure(
+          filePath: filePath,
+          sourceType: type,
+          message: 'AI service could not extract text from the file.',
+          rawText: rawText,
+        );
+      }
+
+      final parsed = parser.parseRawText(rawText);
+      if (parsed.slots.isEmpty) {
+        return TimetableImportResult.failure(
+          filePath: filePath,
+          sourceType: type,
+          message: 'No class slots could be parsed from the AI extracted text.',
+          rawText: rawText,
+          issues: parsed.issues,
+        );
+      }
+
+      return TimetableImportResult.success(
         filePath: filePath,
         sourceType: type,
-        message: extraction.errorMessage ?? 'Failed to extract timetable text.',
-        rawText: extraction.rawText,
-      );
-    }
-
-    final parsed = parser.parseRawText(extraction.rawText);
-    if (parsed.slots.isEmpty) {
-      return TimetableImportResult.failure(
-        filePath: filePath,
-        sourceType: type,
-        message: 'No class slots could be parsed from extracted text.',
-        rawText: extraction.rawText,
+        rawText: rawText,
+        slots: parsed.slots,
         issues: parsed.issues,
       );
+    } catch (e) {
+      return TimetableImportResult.failure(
+        filePath: filePath,
+        sourceType: type,
+        message: 'Timetable AI import failed: $e',
+      );
     }
-
-    return TimetableImportResult.success(
-      filePath: filePath,
-      sourceType: type,
-      rawText: extraction.rawText,
-      slots: parsed.slots,
-      issues: parsed.issues,
-    );
   }
 
   void applyImportedSchedule(List<ParsedClassSlot> slots) {

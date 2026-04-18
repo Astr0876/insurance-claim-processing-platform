@@ -1,7 +1,9 @@
 import 'dart:math';
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../utils/constants.dart';
+import 'gradio_service.dart';
 
 class SearchResult {
   final String snippet;
@@ -21,9 +23,11 @@ enum AssistantMode {
 }
 
 class AssistantService extends ChangeNotifier {
+  final GradioService _gradioService = GradioService();
   String _documentContent = '';
   bool _hasDocument = false;
   AssistantMode _mode = AssistantMode.standard;
+  String? _docId;
   
   // SDK States (Simulated TensorFlow.js Local)
   bool _isInitialized = false;
@@ -59,8 +63,9 @@ class AssistantService extends ChangeNotifier {
   }
 
   Future<void> setupLumina() async {
-    _statusMessage = 'Lumina Engine Ready (Local-Only)';
+    _statusMessage = 'Lumina Engine Ready (Remote-AI)';
     _isInitialized = true;
+    _isModelLoaded = true;
     notifyListeners();
   }
 
@@ -119,6 +124,45 @@ class AssistantService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> uploadNotesToAI(File file) async {
+    _isIndexing = true;
+    _indexingProgress = 0.2;
+    _statusMessage = 'Uploading notes to AI...';
+    notifyListeners();
+
+    try {
+      final remotePath = await _gradioService.uploadFile(file);
+      if (remotePath == null) throw Exception('Upload failed');
+
+      _indexingProgress = 0.5;
+      _statusMessage = 'Processing notes...';
+      notifyListeners();
+
+      final result = await _gradioService.callEndpoint('upload_notes', [
+        {'path': remotePath}
+      ]);
+
+      if (result == null || result is! List || result.isEmpty) {
+        throw Exception('AI processing failed');
+      }
+
+      // result is [ {"doc_id": "...", "message": "..."} ]
+      final data = result[0] as Map<String, dynamic>;
+      _docId = data['doc_id'];
+      _hasDocument = true;
+      _isIndexing = false;
+      _indexingProgress = 1.0;
+      _statusMessage = 'Lumina is Ready (Remote)';
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _statusMessage = 'AI Upload Error: $e';
+      _isIndexing = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   void loadDemoDocument() {
     _documentContent = AppConstants.demoPdfContent;
     _hasDocument = true;
@@ -137,53 +181,36 @@ class AssistantService extends ChangeNotifier {
       return;
     }
 
-    if (!_isModelLoaded) {
-      yield "Lumina's brain isn't loaded yet. Please activate it in the header first! 🧠";
+    if (_docId == null) {
+      yield "Please upload a document first to use Lumina RAG! 📚";
       return;
     }
 
-    // Verify Privacy Guard (Airplane Mode Simulation)
-    yield "🔒 [Privacy Guard] Zero Network Activity Verified...\n";
-    await Future.delayed(const Duration(milliseconds: 400));
+    yield "✨ [AI Synthesis] Thinking and generating answer...\n\n";
     
-    yield "🧠 [Local Vectorization] Searching offline embeddings...\n\n";
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      final result = await _gradioService.callEndpoint('ask_question', [
+        _docId,
+        query
+      ]);
 
-    final results = _internalSearch(query);
-    
-    // Synthesis Logic: Synthesize an answer from snippets
-    yield "✨ [Synthesis] Thinking and generating offline answer...\n\n";
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    final synthesis = _synthesizeAnswer(query, results);
-    final words = synthesis.split(' ');
-    for (var w in words) {
-      await Future.delayed(const Duration(milliseconds: 15));
-      yield "$w ";
-    }
-  }
-
-  String _synthesizeAnswer(String query, List<SearchResult> results) {
-    final lowerQuery = query.toLowerCase();
-
-    // General conversational fallback
-    if (results.isEmpty) {
-      if (lowerQuery.contains('hi') || lowerQuery.contains('hello')) {
-        return "Hello Renee! I'm your local assistant. I couldn't find specific matches in your notes for this, but I'm ready to help with your study materials. Try asking about a topic from your uploaded PDFs!";
+      if (result == null || result is! List || result.isEmpty) {
+        yield "I'm sorry, I couldn't get an answer from the AI service. 😔";
+        return;
       }
-      return "I've searched your notes locally but couldn't find a direct match for \"$query\". Try rephrasing or uploading more relevant materials!";
+
+      // result is [ {"answer": "...", "source": {...}} ]
+      final data = result[0] as Map<String, dynamic>;
+      final answer = data['answer'] as String? ?? 'No answer returned.';
+      
+      final words = answer.split(' ');
+      for (var w in words) {
+        await Future.delayed(const Duration(milliseconds: 15));
+        yield "$w ";
+      }
+    } catch (e) {
+      yield "Error communicating with AI: $e";
     }
-    
-    // Simple synthesis rule: if it's a "what is" question, structure it as a definition
-    if (lowerQuery.contains('what is') || lowerQuery.contains('define') || lowerQuery.contains('features')) {
-      return "Based on your local document, here's a synthesis regarding \"$query\":\n\n${results.first.snippet.replaceAll('...', '').trim()}\n\nThis information is retrieved entirely from your offline storage.";
-    }
-    
-    // Generic synthesis
-    return "I found some relevant information in your document regarding \"$query\". "
-           "Here is a synthesized summary:\n\n"
-           "${results.first.snippet.replaceAll('...', '').trim()}\n\n"
-           "Additionally, your notes mention: ${results.length > 1 ? results[1].snippet.replaceAll('...', '').trim() : 'no other details'}.";
   }
 
   Future<String> askQuestion(String query) async {

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
@@ -20,13 +21,18 @@ class GradioService {
       final response = await request.send();
       if (response.statusCode == 200) {
         final body = await response.stream.bytesToString();
-        final List<dynamic> json = jsonDecode(body);
-        if (json.isNotEmpty) {
-          return json[0] as String;
+        final List<dynamic> result = jsonDecode(body);
+        if (result.isNotEmpty) {
+          final first = result[0];
+          if (first is String) {
+            return first;
+          } else if (first is Map && first.containsKey('path')) {
+            return first['path'] as String;
+          }
         }
       }
     } catch (e) {
-      print('Gradio upload error: $e');
+      debugPrint('Gradio upload error: $e');
     }
     return null;
   }
@@ -43,7 +49,7 @@ class GradioService {
       );
 
       if (callResponse.statusCode != 200) {
-        print('Gradio call error: ${callResponse.statusCode} ${callResponse.body}');
+        debugPrint('Gradio call error: ${callResponse.statusCode} ${callResponse.body}');
         return null;
       }
 
@@ -63,26 +69,43 @@ class GradioService {
       while (true) {
         final resultResponse = await http.get(resultUri);
         if (resultResponse.statusCode != 200) {
-          print('Gradio result error: ${resultResponse.statusCode} ${resultResponse.body}');
+          debugPrint('Gradio result error: ${resultResponse.statusCode} ${resultResponse.body}');
           return null;
         }
 
         final body = resultResponse.body;
-        // Gradio SSE format: "event: complete\ndata: [...]"
+        
+        // Handle Gradio SSE (Server-Sent Events)
         if (body.contains('event: complete')) {
-          final dataLine = body.split('\n').firstWhere((line) => line.startsWith('data: '));
-          final jsonData = jsonDecode(dataLine.substring(6));
-          return jsonData;
-        } else if (body.contains('event: error')) {
-          print('Gradio execution error: $body');
+          final lines = body.split('\n');
+          final dataLine = lines.firstWhere((line) => line.startsWith('data: '), orElse: () => '');
+          if (dataLine.isNotEmpty) {
+            return jsonDecode(dataLine.substring(6));
+          }
+        } 
+        
+        // Handle standard JSON if it's not SSE
+        try {
+          final decoded = jsonDecode(body);
+          if (decoded is Map && decoded.containsKey('data')) {
+            return decoded['data'];
+          } else if (decoded is List) {
+            return decoded;
+          }
+        } catch (_) {
+          // Not a simple JSON, might be pending SSE
+        }
+
+        if (body.contains('event: error')) {
+          debugPrint('Gradio execution error: $body');
           return null;
         }
         
-        // Wait a bit before polling again
+        // If it's still heartbeat or pending, wait and poll
         await Future.delayed(const Duration(milliseconds: 500));
       }
     } catch (e) {
-      print('Gradio service error: $e');
+      debugPrint('Gradio service error: $e');
     }
     return null;
   }

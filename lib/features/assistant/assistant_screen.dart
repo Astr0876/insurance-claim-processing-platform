@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/app_state.dart';
@@ -222,8 +223,8 @@ class _AssistantScreenState extends State<AssistantScreen> {
                           );
 
                           if (result != null && result.files.single.path != null) {
-                            final fileName = result.files.single.name;
-                            await assistant.indexDocument("Content from $fileName: Indexed for RAG.");
+                            final file = File(result.files.single.path!);
+                            await assistant.uploadNotesToAI(file);
                           }
                         } catch (e) {
                           if (mounted) {
