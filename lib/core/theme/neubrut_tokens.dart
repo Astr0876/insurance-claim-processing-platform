@@ -18,6 +18,8 @@ class NBColors {
   static const Color purple  = Color(0xFFB8A9E8);
   static const Color orange  = Color(0xFFFFAB76);
   static const Color danger  = Color(0xFFFF6B6B);
+  static const Color teal    = Color(0xFF008080);
+  static const Color yellow  = Color(0xFFFFFF00);
 
   // ── Semantic Colors ───────────────────────────
   static const Color safe    = green;

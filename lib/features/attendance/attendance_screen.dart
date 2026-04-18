@@ -20,46 +20,37 @@ class AttendanceScreen extends StatelessWidget {
         final classesToRecover = state.attendance.classesToRecover;
         final statusColor     = NBColors.statusColor(overallPct);
 
-        return Scaffold(
-          backgroundColor: NBColors.bg,
-          body: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              // ── Header ──────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 60, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ATTENDANCE',
+        return CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // ── Header ──────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Track & Optimize', style: NBText.heading1),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: NBColors.primary,
+                        border: Border.all(color: NBColors.black, width: 1.5),
+                        borderRadius: NBRadius.softAll,
+                      ),
+                      child: Text(
+                        'YOUR ATTENDANCE RECORD',
                         style: NBText.label.copyWith(
-                          color: const Color(0xFF777777),
-                          letterSpacing: 2,
+                          color: NBColors.black,
+                          fontSize: 10,
                         ),
                       ),
-                      Text('Track & Optimize', style: NBText.heading1),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: NBColors.primary,
-                          border: Border.all(color: NBColors.black, width: 1.5),
-                          borderRadius: NBRadius.softAll,
-                        ),
-                        child: Text(
-                          'your attendance record',
-                          style: NBText.label.copyWith(
-                            color: NBColors.black,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
 
               // ── Overall stats ────────────────────────────────────
               SliverToBoxAdapter(
@@ -172,11 +163,10 @@ class AttendanceScreen extends StatelessWidget {
 
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
-          ),
-        );
-      },
-    );
-  }
+          );
+        },
+      );
+    }
 
   // ── Subject card ─────────────────────────────────────────────────
 

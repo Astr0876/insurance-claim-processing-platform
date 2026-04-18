@@ -29,4 +29,10 @@ class ExpenseController extends ChangeNotifier {
     _chatMessages.add({'type': 'system', 'transaction': newTransaction});
     notifyListeners();
   }
+
+  void clearAll() {
+    _chatMessages.clear();
+    _transactions.clear();
+    notifyListeners();
+  }
 }

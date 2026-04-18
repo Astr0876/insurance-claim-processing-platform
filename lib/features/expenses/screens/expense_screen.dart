@@ -47,73 +47,87 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: NBColors.bg,
-      appBar: AppBar(
-        title: const Text('EXPENSE TRACKER'),
-        backgroundColor: NBColors.bg,
-        elevation: 0,
-        centerTitle: false,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(2),
-          child: Container(color: NBColors.black, height: 2),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  return ListView(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(NBSpacing.md),
-                    children: [
-                      // Render Summary at the top if there are transations
-                      if (_controller.transactions.isNotEmpty) ...[
-                        ExpenseSummaryCard(controller: _controller),
-                        const SizedBox(height: NBSpacing.xl),
-                      ],
-                      // Render chat messages
-                      ..._controller.chatMessages.map(
-                        (msg) => ExpenseChatBubble(message: msg),
-                      ),
-                    ],
-                  );
-                },
-              ),
+    return Column(
+      children: [
+        // ── Info Bar ────────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: const BoxDecoration(
+            color: NBColors.white,
+            border: Border(
+              bottom: BorderSide(color: NBColors.black, width: 2),
             ),
-            // Input Bar
-            Container(
-              decoration: const BoxDecoration(
-                color: NBColors.white,
-                border: Border(top: BorderSide(color: NBColors.black, width: 2)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.account_balance_wallet_outlined, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                'STUDENT EXPENSE TRACKER',
+                style: NBText.label.copyWith(fontSize: 10),
               ),
-              padding: const EdgeInsets.all(NBSpacing.md).copyWith(
-                  bottom: NBSpacing.md + MediaQuery.of(context).padding.bottom),
-              child: Row(
+              const Spacer(),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _controller.clearAll();
+                  });
+                },
+                child: Text('CLEAR ALL', style: NBText.label.copyWith(fontSize: 10, color: NBColors.danger)),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(NBSpacing.md),
                 children: [
-                  Expanded(
-                    child: NBInput(
-                      controller: _textController,
-                      hintText: 'E.g., Spent 200 on food #swiggy',
-                      onSubmitted: (_) => _handleSend(),
-                    ),
-                  ),
-                  const SizedBox(width: NBSpacing.sm),
-                  NBButton(
-                    label: 'SEND',
-                    onTap: _handleSend,
-                    icon: Icons.send,
-                    fillColor: NBColors.primary,
+                  // Render Summary at the top if there are transations
+                  if (_controller.transactions.isNotEmpty) ...[
+                    ExpenseSummaryCard(controller: _controller),
+                    const SizedBox(height: NBSpacing.xl),
+                  ],
+                  // Render chat messages
+                  ..._controller.chatMessages.map(
+                    (msg) => ExpenseChatBubble(message: msg),
                   ),
                 ],
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
-      ),
+        // Input Bar
+        Container(
+          decoration: const BoxDecoration(
+            color: NBColors.white,
+            border: Border(top: BorderSide(color: NBColors.black, width: 2)),
+          ),
+          padding: const EdgeInsets.all(NBSpacing.md).copyWith(
+              bottom: NBSpacing.md + MediaQuery.of(context).padding.bottom),
+          child: Row(
+            children: [
+              Expanded(
+                child: NBInput(
+                  controller: _textController,
+                  hintText: 'E.g., Spent 200 on food #swiggy',
+                  onSubmitted: (_) => _handleSend(),
+                ),
+              ),
+              const SizedBox(width: NBSpacing.sm),
+              NBButton(
+                label: 'SEND',
+                onTap: _handleSend,
+                icon: Icons.send,
+                fillColor: NBColors.primary,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

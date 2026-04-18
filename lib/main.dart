@@ -25,6 +25,9 @@ class LuminaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // DEV TIP: Change this to 'true' to skip the splash screen entirely
+    const bool skipSplash = false;
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppState()..initialize()),
@@ -34,7 +37,7 @@ class LuminaApp extends StatelessWidget {
         title: 'LockIn',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        home: const SplashScreen(),
+        home: skipSplash ? const AppShell() : const SplashScreen(),
       ),
     );
   }

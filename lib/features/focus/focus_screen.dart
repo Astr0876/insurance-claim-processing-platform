@@ -29,36 +29,27 @@ class _FocusScreenState extends State<FocusScreen> {
         final weeklyScores = state.focus.weeklyScores;
         final focusColor   = NBColors.statusColor(focusScore);
 
-        return Scaffold(
-          backgroundColor: NBColors.bg,
-          body: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              // ── Header ──────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 60, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'PRODUCTIVITY',
-                        style: NBText.label.copyWith(
-                          color: const Color(0xFF777777),
-                          letterSpacing: 2,
-                        ),
+        return CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // ── Header ──────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Focus Tracker', style: NBText.heading1),
+                    Text(
+                      'Monitor your study patterns',
+                      style: NBText.body.copyWith(
+                        color: const Color(0xFF666666),
                       ),
-                      Text('Focus Tracker', style: NBText.heading1),
-                      Text(
-                        'Monitor your study patterns',
-                        style: NBText.body.copyWith(
-                          color: const Color(0xFF666666),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
 
               // ── Focus score hero ─────────────────────────────────
               SliverToBoxAdapter(
@@ -353,11 +344,10 @@ class _FocusScreenState extends State<FocusScreen> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
-          ),
-        );
-      },
-    );
-  }
+          );
+        },
+      );
+    }
 
   Widget _weekStat(String label, String value) {
     return Column(

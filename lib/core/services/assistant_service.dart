@@ -2,8 +2,7 @@ import 'dart:math';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../utils/constants.dart';
-// Note: In a real environment, you'd also import runanywhere_llamacpp
-// but for the sake of this implementation we'll focus on the core SDK logic.
+import 'package:runanywhere/runanywhere.dart';
 
 class SearchResult {
   final String snippet;
@@ -26,59 +25,152 @@ class AssistantService extends ChangeNotifier {
   String _documentContent = '';
   bool _hasDocument = false;
   AssistantMode _mode = AssistantMode.standard;
-  bool _isRagInitialized = false;
+  
+  // SDK States
+  bool _isInitialized = false;
+  bool _isModelDownloaded = false;
+  bool _isModelLoaded = false;
+  double _downloadProgress = 0;
+  String _statusMessage = 'Lumina is offline';
 
-  // Mocked state for the RAG SDK components
-  // In a real app, these would be initialized with models
-  dynamic _vectorStore;
-  dynamic _llm;
+  // RunAnywhere Components
+  final RunAnywhereVectorStore _vectorStore = RunAnywhereVectorStore();
 
+  // Getters
   bool get hasDocument => _hasDocument;
   String get documentContent => _documentContent;
   AssistantMode get mode => _mode;
-  bool get isRagInitialized => _isRagInitialized;
+  bool get isInitialized => _isInitialized;
+  bool get isModelDownloaded => _isModelDownloaded;
+  bool get isModelLoaded => _isModelLoaded;
+  double get downloadProgress => _downloadProgress;
+  String get statusMessage => _statusMessage;
 
   void setMode(AssistantMode newMode) {
     _mode = newMode;
-    if (_mode == AssistantMode.luminaRag && !_isRagInitialized) {
-      initializeRag();
+    if (_mode == AssistantMode.luminaRag && !_isInitialized) {
+      setupLumina();
     }
     notifyListeners();
   }
 
-  Future<void> initializeRag() async {
-    // Simulated RAG initialization
-    // In a real app:
-    // await RunAnywhere.initialize();
-    // _vectorStore = RunAnywhereVectorStore();
-    // _llm = RunAnywhereLLM(modelPath: 'path/to/model.gguf');
-    
-    await Future.delayed(const Duration(seconds: 2));
-    _isRagInitialized = true;
-    
-    // Index current document if any
-    if (_hasDocument) {
-      await indexDocument(_documentContent);
+  /// Initial Setup (Registration & Init)
+  Future<void> setupLumina() async {
+    try {
+      _statusMessage = 'Registering Lumina Engine...';
+      notifyListeners();
+
+      // 1. Register LlamaCpp Backend
+      LlamaCpp.register();
+
+      // 2. Add Model Metadata
+      LlamaCpp.addModel(
+        id: 'smollm2-360m',
+        name: 'SmolLM2 360M',
+        url: 'https://huggingface.co/runanywhere/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf',
+        memoryRequirement: 500 * 1024 * 1024, // 500MB
+      );
+
+      // 3. Initialize SDK
+      await RunAnywhere.initialize(
+        environment: SDKEnvironment.development,
+      );
+
+      _isInitialized = true;
+      _statusMessage = 'Lumina Engine Ready';
+      
+      // Check if model is already downloaded
+      final modelInfo = await RunAnywhere.getModelInfo('smollm2-360m');
+      if (modelInfo != null && modelInfo.localPath != null) {
+        _isModelDownloaded = true;
+        _statusMessage = 'Model available locally';
+        await loadLumina();
+      } else {
+        _statusMessage = 'Model download required';
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      _statusMessage = 'Init Error: $e';
+      debugPrint("Lumina Setup Error: $e");
+      notifyListeners();
     }
+  }
+
+  /// Download Model
+  Future<void> downloadLumina() async {
+    if (!_isInitialized) await setupLumina();
     
-    notifyListeners();
+    try {
+      _statusMessage = 'Downloading local brain...';
+      notifyListeners();
+
+      RunAnywhere.downloadModel('smollm2-360m').listen(
+        (progress) {
+          _downloadProgress = progress;
+          _statusMessage = 'Downloading: ${(_downloadProgress * 100).toStringAsFixed(1)}%';
+          notifyListeners();
+        },
+        onDone: () async {
+          _isModelDownloaded = true;
+          _statusMessage = 'Download complete';
+          notifyListeners();
+          await loadLumina();
+        },
+        onError: (e) {
+          _statusMessage = 'Download failed: $e';
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      _statusMessage = 'Download error: $e';
+      notifyListeners();
+    }
+  }
+
+  /// Load Model into Memory
+  Future<void> loadLumina() async {
+    try {
+      _statusMessage = 'Loading brain into memory...';
+      notifyListeners();
+
+      final modelInfo = await RunAnywhere.getModelInfo('smollm2-360m');
+      if (modelInfo != null && modelInfo.localPath != null) {
+        await RunAnywhere.loadModel(modelInfo.localPath!);
+        _isModelLoaded = true;
+        _statusMessage = 'Lumina is Live & Local';
+        
+        // Index document if present
+        if (_hasDocument) {
+          await indexDocument(_documentContent);
+        }
+      }
+      notifyListeners();
+    } catch (e) {
+      _statusMessage = 'Load error: $e';
+      notifyListeners();
+    }
   }
 
   Future<void> indexDocument(String content) async {
-    if (!_isRagInitialized) return;
+    if (!_isModelLoaded) return;
     
-    // In a real app:
-    // final doc = Document(id: DateTime.now().toString(), content: content);
-    // await _vectorStore.addDocuments([doc]);
-    
-    debugPrint("Indexing document for RAG...");
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final doc = Document(
+        id: 'user_notes_${DateTime.now().millisecondsSinceEpoch}',
+        content: content,
+        metadata: {'type': 'textbook'},
+      );
+      await _vectorStore.addDocuments([doc]);
+    } catch (e) {
+      debugPrint("Indexing Error: $e");
+    }
   }
 
   void loadDemoDocument() {
     _documentContent = AppConstants.demoPdfContent;
     _hasDocument = true;
-    if (_isRagInitialized) {
+    if (_isModelLoaded) {
       indexDocument(_documentContent);
     }
   }
@@ -86,34 +178,101 @@ class AssistantService extends ChangeNotifier {
   void loadDocument(String content) {
     _documentContent = content;
     _hasDocument = content.isNotEmpty;
-    if (_isRagInitialized) {
+    if (_isModelLoaded) {
       indexDocument(_documentContent);
     }
     notifyListeners();
   }
 
+  /// RAG mode: Streams a generated answer
+  Stream<String> getAnswerStream(String query) async* {
+    if (_mode == AssistantMode.standard) {
+      yield getAnswer(query);
+      return;
+    }
+
+    if (!_isModelLoaded) {
+      yield "Lumina's local brain is not loaded. Please wait or check status. 🧠";
+      if (!_isInitialized) await setupLumina();
+      if (!_isModelDownloaded) {
+        yield "Model download required. Starting download... ⬇️";
+        await downloadLumina();
+        return;
+      }
+      await loadLumina();
+    }
+
+    // 1. Retrieval
+    yield "Searching your local notes... 🔍";
+    List<Document> contextDocs = [];
+    try {
+      contextDocs = await _vectorStore.similaritySearch(query, k: 3);
+    } catch (e) {
+      debugPrint("Retrieval error: $e");
+    }
+
+    final contextText = contextDocs.map((d) => d.content).join('\n\n');
+
+    // 2. Generation
+    yield "Lumina is synthesizing an answer... ✨";
+
+    final prompt = contextText.isNotEmpty 
+      ? "Use this context: $contextText\n\nQuestion: $query\nAnswer:"
+      : "Question: $query\nAnswer:";
+
+    try {
+      final streamResult = await RunAnywhere.generateStream(
+        prompt,
+        options: LLMGenerationOptions(
+          maxTokens: 512,
+          temperature: 0.7,
+        ),
+      );
+
+      String accumulated = "";
+      await for (final token in streamResult.stream) {
+        accumulated += token;
+        yield accumulated;
+      }
+      
+      final finalResult = await streamResult.result;
+      yield "$accumulated\n\n---\n*Speed: ${finalResult.tokensPerSecond?.toStringAsFixed(1)} tok/s | On-Device*";
+    } catch (e) {
+      // Small talk fallback for simple greetings
+      final lower = query.toLowerCase().trim();
+      if (lower == 'hi' || lower == 'hello') {
+        yield "Hello! I'm Lumina. How can I help you with your studies today? 👋";
+      } else {
+        yield "Local generation error: $e\n\nFallback search:\n${getAnswer(query)}";
+      }
+    }
+  }
+
+  /// Fallback Search
+  String getAnswer(String query) {
+    final results = _internalSearch(query);
+    if (results.isEmpty) return "No matches found in your notes. Try rephrasing!";
+    final buffer = StringBuffer();
+    buffer.writeln("Quick Search Results:\n");
+    for (var res in results) buffer.writeln(res.snippet);
+    return buffer.toString().trim();
+  }
+
   List<SearchResult> _internalSearch(String query) {
     if (!_hasDocument || query.trim().isEmpty) return [];
-
-    final queryWords = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.length > 2).toList();
+    final queryWords = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.length >= 2).toList();
     if (queryWords.isEmpty) return [];
-
-    // Split document into paragraphs
     final paragraphs = _documentContent.split(RegExp(r'\n\n+'));
     final results = <SearchResult>[];
-
     for (final para in paragraphs) {
-      if (para.trim().length < 20) continue;
-
+      if (para.trim().length < 10) continue;
       final paraLower = para.toLowerCase();
       int matchCount = 0;
       for (final word in queryWords) {
         if (paraLower.contains(word)) matchCount++;
       }
-
       if (matchCount > 0) {
         final relevance = matchCount / queryWords.length;
-        // Trim to reasonable snippet length
         String snippet = para.trim();
         if (snippet.length > 300) {
           int bestPos = 0;
@@ -129,65 +288,7 @@ class AssistantService extends ChangeNotifier {
         results.add(SearchResult(snippet: snippet, relevance: relevance));
       }
     }
-
     results.sort((a, b) => b.relevance.compareTo(a.relevance));
     return results.take(3).toList();
-  }
-
-  /// Standard mode: Returns combined snippets
-  String getAnswer(String query) {
-    final results = _internalSearch(query);
-    if (results.isEmpty) {
-      return "I couldn't find relevant information in the loaded documents. Try rephrasing your question or upload a document that covers this topic.";
-    }
-
-    final buffer = StringBuffer();
-    buffer.writeln("Based on your study materials:\n");
-    
-    for (int i = 0; i < results.length; i++) {
-      buffer.writeln(results[i].snippet);
-      if (i < results.length - 1) buffer.writeln();
-    }
-
-    return buffer.toString().trim();
-  }
-
-  /// RAG mode: Streams a generated answer
-  Stream<String> getAnswerStream(String query) async* {
-    if (_mode == AssistantMode.standard) {
-      yield getAnswer(query);
-      return;
-    }
-
-    // Lumina RAG Logic
-    yield "Searching your local second brain... 🧠";
-    await Future.delayed(const Duration(milliseconds: 800));
-    
-    final results = _internalSearch(query);
-    if (results.isEmpty) {
-      yield "I've searched through all your offline notes, but couldn't find a direct answer. 📚\n\nTry uploading a more specific textbook or rephrasing.";
-      return;
-    }
-
-    yield "Retrieving context from your PDFs... 📄";
-    await Future.delayed(const Duration(milliseconds: 600));
-    
-    yield "Lumina is synthesizing an answer entirely offline... ✨\n\n";
-    await Future.delayed(const Duration(milliseconds: 1000));
-
-    // Simulated streaming of a "smarter" answer
-    final baseAnswer = getAnswer(query).replaceFirst("Based on your study materials:\n\n", "");
-    final words = baseAnswer.split(' ');
-    
-    String currentText = "According to your textbooks, ";
-    yield currentText;
-    
-    for (var word in words) {
-      await Future.delayed(Duration(milliseconds: 20 + Random().nextInt(40)));
-      currentText += "$word ";
-      yield currentText;
-    }
-    
-    yield "$currentText\n\n---\n*Generated by Lumina Local RAG (TensorFlow.js/RunAnywhere Backend)*";
   }
 }

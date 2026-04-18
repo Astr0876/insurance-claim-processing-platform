@@ -4,6 +4,7 @@ import '../services/focus_service.dart';
 import '../services/timetable_service.dart';
 import '../services/assistant_service.dart';
 import '../services/kanban_service.dart';
+import '../services/latex_service.dart';
 
 class HomeWidgetSnapshot {
   final String nextClassLabel;
@@ -25,6 +26,7 @@ class AppState extends ChangeNotifier {
   final TimetableService timetable = TimetableService();
   final AssistantService assistant = AssistantService();
   final KanbanService kanban = KanbanService();
+  final LaTeXService latex = LaTeXService();
 
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
@@ -55,6 +57,7 @@ class AppState extends ChangeNotifier {
     assistant.loadDemoDocument();
     _refreshWidgetSnapshot();
     kanban.loadDemoData();
+    latex.loadDemoData();
 
     _isInitialized = true;
     notifyListeners();

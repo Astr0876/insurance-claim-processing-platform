@@ -108,259 +108,220 @@ class _AssistantScreenState extends State<AssistantScreen> {
     final state = Provider.of<AppState>(context);
     final assistant = state.assistant;
 
-    return Scaffold(
-      backgroundColor: NBColors.bg,
-      body: Column(
-        children: [
-          // ── Header ────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 50, 20, 16),
-            decoration: BoxDecoration(
-              color: assistant.mode == AssistantMode.luminaRag 
-                  ? const Color(0xFFE1BEE7) // Soft Purple for RAG
-                  : NBColors.primary,
-              border: const Border(
-                bottom: BorderSide(color: NBColors.black, width: 2),
-              ),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    // Bot icon box
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: NBColors.white,
-                        border: Border.all(color: NBColors.black, width: 2),
-                        borderRadius: NBRadius.softAll,
-                        boxShadow: NBShadows.small,
-                      ),
-                      child: Icon(
-                        assistant.mode == AssistantMode.luminaRag 
-                            ? Icons.psychology_rounded
-                            : Icons.smart_toy_rounded,
-                        color: NBColors.black,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            assistant.mode == AssistantMode.luminaRag 
-                                ? 'LUMINA RAG'
-                                : 'SEMANTIC ASSISTANT',
-                            style: NBText.label.copyWith(
-                              fontSize: 14,
-                              letterSpacing: 2,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                color: assistant.mode == AssistantMode.luminaRag 
-                                    ? Colors.purple
-                                    : NBColors.green,
-                                margin: const EdgeInsets.only(right: 6),
-                              ),
-                              Text(
-                                assistant.mode == AssistantMode.luminaRag 
-                                    ? 'LOCAL BRAIN • OFFLINE'
-                                    : 'QUICK SEARCH • OFFLINE',
-                                style: NBText.label.copyWith(fontSize: 9),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Clear button
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _messages.clear();
-                          _messages.add(ChatMessage(
-                            text: 'Memory wiped. Ask me anything! 🧠',
-                            isUser: false,
-                          ));
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: NBColors.white,
-                          border: Border.all(color: NBColors.black, width: 2),
-                          borderRadius: NBRadius.softAll,
-                          boxShadow: NBShadows.small,
-                        ),
-                        child: const Icon(
-                          Icons.delete_outline_rounded,
-                          color: NBColors.black,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Upload button
-                    GestureDetector(
-                      onTap: () async {
-                        final state = Provider.of<AppState>(context, listen: false);
-                        try {
-                          final result = await FilePicker.pickFiles(
-                            type: FileType.custom,
-                            allowedExtensions: ['pdf', 'txt'],
-                          );
-
-                          if (result != null && result.files.single.path != null) {
-                            final fileName = result.files.single.name;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Indexing $fileName into Local Brain...'),
-                                backgroundColor: Colors.purple,
-                              ),
-                            );
-                            
-                            // Simulate reading the file content
-                            // In a real app, you'd use a PDF parser like syncfusion_flutter_pdf
-                            await Future.delayed(const Duration(seconds: 2));
-                            
-                            state.assistant.loadDocument("Content from $fileName: This is a deep dive into the subject matter of $fileName. It covers key concepts, definitions, and advanced theories that Lumina can now use to answer your queries offline.");
-                            
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('$fileName Indexed! ✨'),
-                                  backgroundColor: NBColors.green,
-                                ),
-                              );
-                            }
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Error selecting file')),
-                            );
-                          }
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: NBColors.white,
-                          border: Border.all(color: NBColors.black, width: 2),
-                          borderRadius: NBRadius.softAll,
-                          boxShadow: NBShadows.small,
-                        ),
-                        child: const Icon(
-                          Icons.picture_as_pdf_rounded,
-                          color: NBColors.black,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // ── Mode Switcher ─────────────────────────────────────
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ModeButton(
-                        label: 'Standard',
-                        icon: Icons.search_rounded,
-                        isSelected: assistant.mode == AssistantMode.standard,
-                        onTap: () => assistant.setMode(AssistantMode.standard),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _ModeButton(
-                        label: 'Lumina RAG',
-                        icon: Icons.auto_awesome_rounded,
-                        isSelected: assistant.mode == AssistantMode.luminaRag,
-                        onTap: () => assistant.setMode(AssistantMode.luminaRag),
-                        isSpecial: true,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+    return Column(
+      children: [
+        // ── Info Bar & Mode Selector ────────────────────────────────
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: const BoxDecoration(
+            color: NBColors.white,
+            border: Border(
+              bottom: BorderSide(color: NBColors.black, width: 2),
             ),
           ),
-
-          // ── Messages list ─────────────────────────────────────────
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount: _messages.length + (_isTyping ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (_isTyping && index == _messages.length) {
-                  return _buildTypingIndicator();
-                }
-                return _buildMessageBubble(_messages[index]);
-              },
-            ),
-          ),
-
-          // ── Input area ────────────────────────────────────────────
-          Container(
-            padding: EdgeInsets.fromLTRB(
-              16, 12, 16,
-              MediaQuery.of(context).padding.bottom + 12,
-            ),
-            decoration: const BoxDecoration(
-              color: NBColors.white,
-              border: Border(
-                top: BorderSide(color: NBColors.black, width: 2),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: NBColors.bg,
-                      border: Border.all(color: NBColors.black, width: 2),
-                      borderRadius: NBRadius.softAll,
-                    ),
-                    child: TextField(
-                      controller: _controller,
-                      style: NBText.body,
-                      decoration: InputDecoration(
-                        hintText: assistant.mode == AssistantMode.luminaRag 
-                            ? 'Query your local brain...' 
-                            : 'Ask about your notes...',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFF888888),
-                          fontWeight: FontWeight.w500,
-                        ),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                      ),
-                      onSubmitted: (_) => _sendMessage(),
-                      textInputAction: TextInputAction.send,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      assistant.mode == AssistantMode.luminaRag 
+                        ? 'LUMINA RAG • LOCAL BRAIN ACTIVE'
+                        : 'SEMANTIC ASSISTANT • QUICK SEARCH',
+                      style: NBText.label.copyWith(fontSize: 10),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                _SendButton(onSend: _sendMessage),
-              ],
+                  _headerAction(Icons.delete_outline_rounded, () {
+                    setState(() {
+                      _messages.clear();
+                      _messages.add(ChatMessage(
+                        text: 'Memory wiped. Ask me anything! 🧠',
+                        isUser: false,
+                      ));
+                    });
+                  }),
+                  const SizedBox(width: 8),
+                  _headerAction(Icons.picture_as_pdf_rounded, () => _handleFileUpload(context, state)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _modeTab(
+                      'Standard AI',
+                      Icons.search_rounded,
+                      assistant.mode == AssistantMode.standard,
+                      () => assistant.setMode(AssistantMode.standard),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _modeTab(
+                      'Lumina RAG',
+                      Icons.auto_awesome_rounded,
+                      assistant.mode == AssistantMode.luminaRag,
+                      () => assistant.setMode(AssistantMode.luminaRag),
+                      isSpecial: true,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // ── Messages list ─────────────────────────────────────────
+        Expanded(
+          child: ListView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            itemCount: _messages.length + (_isTyping ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (_isTyping && index == _messages.length) {
+                return _buildTypingIndicator();
+              }
+              return _buildMessageBubble(_messages[index]);
+            },
+          ),
+        ),
+
+        // ── Input area ────────────────────────────────────────────
+        Container(
+          padding: EdgeInsets.fromLTRB(
+            16, 12, 16,
+            MediaQuery.of(context).padding.bottom + 12,
+          ),
+          decoration: const BoxDecoration(
+            color: NBColors.white,
+            border: Border(
+              top: BorderSide(color: NBColors.black, width: 2),
             ),
           ),
-        ],
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: NBColors.bg,
+                    border: Border.all(color: NBColors.black, width: 2),
+                    borderRadius: NBRadius.softAll,
+                  ),
+                  child: TextField(
+                    controller: _controller,
+                    style: NBText.body,
+                    decoration: InputDecoration(
+                      hintText: assistant.mode == AssistantMode.luminaRag 
+                          ? 'Query your local brain...' 
+                          : 'Ask about your notes...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF888888),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                    ),
+                    onSubmitted: (_) => _sendMessage(),
+                    textInputAction: TextInputAction.send,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              _SendButton(onSend: _sendMessage),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _headerAction(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: NBColors.white,
+          border: Border.all(color: NBColors.black, width: 1.5),
+          borderRadius: NBRadius.softAll,
+        ),
+        child: Icon(icon, color: NBColors.black, size: 18),
       ),
     );
+  }
+
+  Widget _modeTab(String label, IconData icon, bool active, VoidCallback onTap, {bool isSpecial = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: active ? (isSpecial ? Colors.purple : NBColors.black) : NBColors.white,
+          border: Border.all(color: NBColors.black, width: 2),
+          borderRadius: NBRadius.softAll,
+          boxShadow: active ? NBShadows.small : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: active ? NBColors.white : NBColors.black),
+            const SizedBox(width: 6),
+            Text(
+              label.toUpperCase(),
+              style: NBText.label.copyWith(
+                fontSize: 10,
+                color: active ? NBColors.white : NBColors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleFileUpload(BuildContext context, AppState state) async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'txt'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final fileName = result.files.single.name;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Indexing $fileName into Local Brain...'),
+            backgroundColor: Colors.purple,
+          ),
+        );
+        
+        await Future.delayed(const Duration(seconds: 2));
+        state.assistant.loadDocument("Content from $fileName: This is indexed content.");
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$fileName Indexed! ✨'),
+              backgroundColor: NBColors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error selecting file')),
+        );
+      }
+    }
   }
 
   Widget _buildMessageBubble(ChatMessage message) {
@@ -473,59 +434,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ModeButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final bool isSpecial;
-
-  const _ModeButton({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-    this.isSpecial = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? (isSpecial ? Colors.purple : NBColors.black)
-              : NBColors.white,
-          border: Border.all(color: NBColors.black, width: 2),
-          borderRadius: NBRadius.softAll,
-          boxShadow: isSelected ? NBShadows.pressed : NBShadows.small,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected ? NBColors.white : NBColors.black,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: NBText.label.copyWith(
-                fontSize: 10,
-                color: isSelected ? NBColors.white : NBColors.black,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

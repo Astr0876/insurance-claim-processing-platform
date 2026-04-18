@@ -42,45 +42,36 @@ class _StudyHubRoomsScreenState extends State<StudyHubRoomsScreen> {
   Widget build(BuildContext context) {
     return Consumer<HubService>(
       builder: (context, svc, _) {
-        return Scaffold(
-          backgroundColor: NBColors.bg,
-          body: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              // ── Header ──────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 60, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'COLLABORATIVE',
-                        style: NBText.label.copyWith(
-                          color: const Color(0xFF777777),
-                          letterSpacing: 2,
+        return CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // ── Header ──────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('COLLABORATIVE STUDY', style: NBText.heading1),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        NBBadge(
+                          label: '${svc.myRooms.length} Rooms',
+                          fillColor: NBColors.black,
+                          textColor: NBColors.white,
                         ),
-                      ),
-                      Text('Study Hub', style: NBText.heading1),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          NBBadge(
-                            label: '${svc.myRooms.length} Rooms',
-                            fillColor: NBColors.black,
-                            textColor: NBColors.white,
-                          ),
-                          const SizedBox(width: 8),
-                          NBBadge(
-                            label: svc.isConnected ? 'Connected' : 'Demo Mode',
-                            fillColor: svc.isConnected ? NBColors.green : NBColors.orange,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 8),
+                        NBBadge(
+                          label: svc.isConnected ? 'Connected' : 'Demo Mode',
+                          fillColor: svc.isConnected ? NBColors.green : NBColors.orange,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
+            ),
 
               // ── Create + Join buttons ────────────────────────────
               SliverToBoxAdapter(
@@ -190,11 +181,10 @@ class _StudyHubRoomsScreenState extends State<StudyHubRoomsScreen> {
                 ),
               ),
             ],
-          ),
-        );
-      },
-    );
-  }
+          );
+        },
+      );
+    }
 
   // ── Create room dialog ────────────────────────────────────────────
 

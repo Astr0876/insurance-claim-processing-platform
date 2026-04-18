@@ -6,6 +6,8 @@ import '../../core/utils/helpers.dart';
 import '../../core/widgets/nb_card.dart';
 import '../../core/widgets/nb_badge.dart';
 import '../shared/widgets.dart';
+import '../latex/latex_preview_screen.dart';
+import 'package:intl/intl.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onNavigate;
@@ -29,7 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       duration: const Duration(milliseconds: 900),
     );
 
-    _fadeAnimations = List.generate(5, (i) {
+    _fadeAnimations = List.generate(6, (i) {
       final start = i * 0.12;
       final end = (start + 0.4).clamp(0.0, 1.0);
       return Tween<double>(begin: 0, end: 1).animate(
@@ -89,10 +91,18 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ),
 
-            // ── Quick actions ──────────────────────────────────────
+            // ── LaTeX Preview ──────────────────────────────────────
             SliverToBoxAdapter(
               child: FadeTransition(
                 opacity: _fadeAnimations[3],
+                child: _buildLaTeXCard(state),
+              ),
+            ),
+
+            // ── Quick actions ──────────────────────────────────────
+            SliverToBoxAdapter(
+              child: FadeTransition(
+                opacity: _fadeAnimations[4],
                 child: _buildQuickActions(),
               ),
             ),
@@ -116,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildHeader(AppState state) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 60, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       color: NBColors.bg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,28 +138,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               letterSpacing: 2,
             ),
           ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(child: Text('LUMINA', style: NBText.heading1)),
-              // Profile badge
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: NBColors.primary,
-                  border: Border.all(color: NBColors.black, width: 2),
-                  borderRadius: NBRadius.softAll,
-                  boxShadow: NBShadows.small,
-                ),
-                child: const Icon(
-                  Icons.person_outline_rounded,
-                  color: NBColors.black,
-                  size: 22,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
@@ -444,6 +433,88 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                 ],
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── LaTeX Preview ─────────────────────────────────────────────────
+
+  Widget _buildLaTeXCard(AppState state) {
+    final report = state.latex.currentReport;
+    if (report == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      child: NBCard(
+        onTap: () {
+          Navigator.push(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, _) => const LaTeXPreviewScreen(),
+              transitionsBuilder: (context, animation, _, child) =>
+                  FadeTransition(opacity: animation, child: child),
+            ),
+          );
+        },
+        fillColor: NBColors.white,
+        shadows: NBShadows.medium,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.article_rounded,
+                  color: NBColors.black,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'OVERLEAF SYNC',
+                  style: NBText.label.copyWith(letterSpacing: 2),
+                ),
+                const Spacer(),
+                if (state.latex.isSyncing)
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: NBColors.black,
+                    ),
+                  )
+                else
+                  const Icon(Icons.check_circle_rounded, color: NBColors.green, size: 16),
+              ],
+            ),
+            const SizedBox(height: NBSpacing.md),
+            Text(report.name, style: NBText.heading3),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Text(
+                  'LAST COMPILED: ',
+                  style: NBText.label.copyWith(
+                    color: const Color(0xFF777777),
+                    fontSize: 8,
+                  ),
+                ),
+                Text(
+                  DateFormat('hh:mm a, dd MMM').format(report.lastUpdated),
+                  style: NBText.bodySmall.copyWith(fontSize: 10),
+                ),
+                const Spacer(),
+                Text(
+                  'PREVIEW',
+                  style: NBText.label.copyWith(
+                    color: NBColors.blue,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

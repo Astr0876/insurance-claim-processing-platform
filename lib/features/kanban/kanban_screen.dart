@@ -4,6 +4,7 @@ import 'package:kanban_board/kanban_board.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/services/kanban_service.dart';
 import '../../core/theme/neubrut_tokens.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/nb_card.dart';
 import '../../core/widgets/nb_button.dart';
 
@@ -22,7 +23,6 @@ class _KanbanScreenState extends State<KanbanScreen> {
     final appState = context.watch<AppState>();
     final kanban = appState.kanban;
 
-    // Define groups based on KanbanStatus
     final List<KanbanBoardGroup<String, KanbanTask>> groups = [
       KanbanBoardGroup(
         id: 'todo',
@@ -40,6 +40,14 @@ class _KanbanScreenState extends State<KanbanScreen> {
         items: kanban.doneTasks,
       ),
     ];
+
+    KanbanBoardGroup<String, KanbanTask> findGroup(dynamic id) {
+      if (id is int) {
+        return groups[id];
+      }
+      final idStr = id.toString();
+      return groups.firstWhere((g) => g.id == idStr, orElse: () => groups[0]);
+    }
 
     return Scaffold(
       backgroundColor: NBColors.bg,
@@ -66,12 +74,8 @@ class _KanbanScreenState extends State<KanbanScreen> {
           final String taskId;
           final KanbanStatus newStatus;
 
-          if (oldGroupId is int) {
-            taskId = groups[oldGroupId].items[oldItemIndex!].taskId;
-          } else {
-            final group = groups.firstWhere((g) => g.id == oldGroupId.toString());
-            taskId = group.items[oldItemIndex!].taskId;
-          }
+          final oldGroup = findGroup(oldGroupId);
+          taskId = oldGroup.items[oldItemIndex!].taskId;
 
           if (newGroupId is int) {
             newStatus = _statusFromGroupIndex(newGroupId);
@@ -82,12 +86,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
           kanban.updateTaskStatus(taskId, newStatus);
         },
         groupHeaderBuilder: (context, groupId) {
-          final KanbanBoardGroup<String, KanbanTask> group;
-          if (groupId is int) {
-            group = groups[groupId as int];
-          } else {
-            group = groups.firstWhere((g) => g.id == groupId.toString());
-          }
+          final group = findGroup(groupId);
           
           return Padding(
             padding: const EdgeInsets.all(NBSpacing.md),
@@ -124,13 +123,8 @@ class _KanbanScreenState extends State<KanbanScreen> {
           );
         },
         groupItemBuilder: (context, groupId, itemIndex) {
-          final KanbanBoardGroup<String, KanbanTask> group;
-          if (groupId is int) {
-            group = groups[groupId as int];
-          } else {
-            group = groups.firstWhere((g) => g.id == groupId.toString());
-          }
-          final task = group.items[itemIndex];
+          final group = findGroup(groupId);
+          final task = group.items[itemIndex!];
           
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: NBSpacing.md, vertical: NBSpacing.xs),

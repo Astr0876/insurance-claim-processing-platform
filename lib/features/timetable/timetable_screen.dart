@@ -54,45 +54,36 @@ class _TimetableScreenState extends State<TimetableScreen>
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, state, _) {
-        return Scaffold(
-          backgroundColor: NBColors.bg,
-          body: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              // ── Header ──────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 60, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'SCHEDULE',
-                        style: NBText.label.copyWith(
-                          color: const Color(0xFF777777),
-                          letterSpacing: 2,
+        return CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // ── Header ──────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('WEEKLY SCHEDULE', style: NBText.heading1),
                         ),
+                        _buildImportButton(state),
+                        const SizedBox(width: 8),
+                        _buildAddButton(state),
+                      ],
+                    ),
+                    Text(
+                      'Week at a glance',
+                      style: NBText.body.copyWith(
+                        color: const Color(0xFF666666),
                       ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text('Timetable', style: NBText.heading1),
-                          ),
-                          _buildImportButton(state),
-                          const SizedBox(width: 8),
-                          _buildAddButton(state),
-                        ],
-                      ),
-                      Text(
-                        'Week at a glance',
-                        style: NBText.body.copyWith(
-                          color: const Color(0xFF666666),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
 
               // ── Day Tabs ────────────────────────────────────────
               SliverToBoxAdapter(
@@ -150,11 +141,10 @@ class _TimetableScreenState extends State<TimetableScreen>
 
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
-          ),
-        );
-      },
-    );
-  }
+          );
+        },
+      );
+    }
 
   Widget _buildAddButton(AppState state) {
     return GestureDetector(
