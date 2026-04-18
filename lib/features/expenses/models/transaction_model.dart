@@ -21,6 +21,35 @@ class TransactionModel {
     this.peopleCount = 1,
   });
 
+  factory TransactionModel.fromSupabase(Map<String, dynamic> map) {
+    return TransactionModel(
+      id: map['id'],
+      amount: double.tryParse(map['amount'].toString()) ?? 0.0,
+      category: map['category'] ?? '',
+      type: TransactionType.values.firstWhere(
+        (e) => e.toString().split('.').last == map['type'],
+        orElse: () => TransactionType.spent,
+      ),
+      date: DateTime.parse(map['date']),
+      rawMessage: map['raw_message'] ?? '',
+      tags: List<String>.from(map['tags'] ?? []),
+      peopleCount: map['people_count'] ?? 1,
+    );
+  }
+
+  Map<String, dynamic> toSupabase(String userId) {
+    return {
+      'user_id': userId,
+      'amount': amount,
+      'category': category,
+      'type': type.toString().split('.').last,
+      'tags': tags,
+      'people_count': peopleCount,
+      'raw_message': rawMessage,
+      'date': date.toIso8601String(),
+    };
+  }
+
   double get effectiveAmount {
     if (type == TransactionType.split && peopleCount > 0) {
       return amount / peopleCount;

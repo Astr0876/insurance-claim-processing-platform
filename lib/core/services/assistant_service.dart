@@ -152,8 +152,8 @@ class AssistantService extends ChangeNotifier {
     final results = _internalSearch(query);
     
     // Synthesis Logic: Synthesize an answer from snippets
-    yield "✨ [Synthesis] Generating offline answer...\n\n";
-    await Future.delayed(const Duration(milliseconds: 600));
+    yield "✨ [Synthesis] Thinking and generating offline answer...\n\n";
+    await Future.delayed(const Duration(milliseconds: 800));
 
     final synthesis = _synthesizeAnswer(query, results);
     final words = synthesis.split(' ');
