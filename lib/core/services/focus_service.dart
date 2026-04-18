@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FocusSession {
   final DateTime startTime;
@@ -28,6 +29,27 @@ class FocusSession {
     if (durationMinutes > 90) score += 5;
     return score.clamp(0, 100);
   }
+
+  Map<String, dynamic> toJson(String userId) {
+    return {
+      'user_id': userId,
+      'label': label,
+      'start_time': startTime.toIso8601String(),
+      'end_time': endTime.toIso8601String(),
+      'app_switches': appSwitches,
+      'distractions': distractions,
+    };
+  }
+
+  factory FocusSession.fromJson(Map<String, dynamic> json) {
+    return FocusSession(
+      startTime: DateTime.parse(json['start_time']),
+      endTime: DateTime.parse(json['end_time']),
+      appSwitches: json['app_switches'] ?? 0,
+      distractions: json['distractions'] ?? 0,
+      label: json['label'] ?? 'Focus Session',
+    );
+  }
 }
 
 class AppContext {
@@ -46,6 +68,17 @@ class FocusService extends ChangeNotifier {
   final List<FocusSession> _sessions = [];
   final Random _rand = Random(42);
 
+  // --- Session Tracking ---
+  bool _isTracking = false;
+  DateTime? _sessionStartTime;
+  int _currentAppSwitches = 0;
+  int _currentDistractions = 0;
+  String _currentLabel = 'New Session';
+
+  bool get isTracking => _isTracking;
+  int get currentAppSwitches => _currentAppSwitches;
+  int get currentDistractions => _currentDistractions;
+
   // --- Context Switching & Cognitive Debt ---
   final List<AppContext> _contextHistory = [];
   double _cognitiveDebt = 0.0;
@@ -56,10 +89,132 @@ class FocusService extends ChangeNotifier {
 
   double get cognitiveDebt => _cognitiveDebt;
 
+  void startSession({String label = 'Deep Work'}) {
+    _isTracking = true;
+    _sessionStartTime = DateTime.now();
+    _currentAppSwitches = 0;
+    _currentDistractions = 0;
+    _currentLabel = label;
+    notifyListeners();
+  }
+
+  Future<void> endSession() async {
+    if (!_isTracking || _sessionStartTime == null) return;
+
+    final endTime = DateTime.now();
+    final session = FocusSession(
+      startTime: _sessionStartTime!,
+      endTime: endTime,
+      appSwitches: _currentAppSwitches,
+      distractions: _currentDistractions,
+      label: _currentLabel,
+    );
+
+    _sessions.add(session);
+    _isTracking = false;
+    _sessionStartTime = null;
+
+    // --- Supabase Insertion ---
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        await supabase.from('focus_sessions').insert(session.toJson(user.id));
+        debugPrint('Focus session saved to Supabase');
+        
+        // Fetch last 7 days of sessions to compute Cognitive Debt Score
+        await computeCognitiveDebtFromHistory();
+      }
+    } catch (e) {
+      debugPrint('Error saving focus session to Supabase: $e');
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> fetchSessions() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final response = await supabase
+          .from('focus_sessions')
+          .select()
+          .eq('user_id', user.id)
+          .order('start_time', ascending: false);
+
+      if (response.isNotEmpty) {
+        _sessions.clear();
+        for (var row in response) {
+          _sessions.add(FocusSession.fromJson(row));
+        }
+        debugPrint('Fetched ${_sessions.length} focus sessions from Supabase');
+        
+        await computeCognitiveDebtFromHistory();
+      }
+    } catch (e) {
+      debugPrint('Error fetching focus sessions: $e');
+    }
+    notifyListeners();
+  }
+
+  Future<void> computeCognitiveDebtFromHistory() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final lastWeek = DateTime.now().subtract(const Duration(days: 7)).toIso8601String();
+      
+      final response = await supabase
+          .from('focus_sessions')
+          .select()
+          .eq('user_id', user.id)
+          .gte('start_time', lastWeek);
+
+      if (response.isNotEmpty) {
+        int totalSwitches = 0;
+        int totalDistractions = 0;
+        int count = response.length;
+
+        for (var row in response) {
+          totalSwitches += (row['app_switches'] as int? ?? 0);
+          totalDistractions += (row['distractions'] as int? ?? 0);
+        }
+
+        // Formula for Cognitive Debt Score: 
+        // Average switches and distractions per session, weighted
+        // (Avg Switches * 0.5) + (Avg Distractions * 2.0)
+        final avgSwitches = totalSwitches / count;
+        final avgDistractions = totalDistractions / count;
+        
+        _cognitiveDebt = (avgSwitches * 0.5) + (avgDistractions * 2.0);
+        // Normalize to some extent, e.g., max 100
+        _cognitiveDebt = _cognitiveDebt.clamp(0, 100);
+        
+        debugPrint('Computed Cognitive Debt Score from history: ${_cognitiveDebt.toStringAsFixed(1)}');
+      } else {
+        _cognitiveDebt = 0.0;
+      }
+    } catch (e) {
+      debugPrint('Error computing cognitive debt from history: $e');
+    }
+    notifyListeners();
+  }
+
   void recordAppSwitch(String appName) {
     final now = DateTime.now();
     final isStudy = studyApps.contains(appName);
     final isDistraction = distractionApps.contains(appName);
+
+    // Track for current session
+    if (_isTracking) {
+      _currentAppSwitches++;
+      if (isDistraction) {
+        _currentDistractions++;
+      }
+    }
 
     // Exponential Decay: Debt decreases over time if no switches happen
     if (_contextHistory.isNotEmpty) {

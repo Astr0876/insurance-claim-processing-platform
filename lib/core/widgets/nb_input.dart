@@ -12,6 +12,8 @@ class NBInput extends StatelessWidget {
   final TextStyle? style;
   final bool autofocus;
   final int? maxLines;
+  final bool obscureText;
+  final TextInputType? keyboardType;
 
   const NBInput({
     super.key,
@@ -24,6 +26,8 @@ class NBInput extends StatelessWidget {
     this.style,
     this.autofocus = false,
     this.maxLines = 1,
+    this.obscureText = false,
+    this.keyboardType,
   });
 
   @override
@@ -40,6 +44,8 @@ class NBInput extends StatelessWidget {
           controller: controller,
           autofocus: autofocus,
           maxLines: maxLines,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
           onSubmitted: onSubmitted,
           textInputAction: textInputAction,
           style: style ?? NBText.body,

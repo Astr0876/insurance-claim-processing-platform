@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumina/features/expenses/controllers/expense_controller.dart';
 import 'package:lumina/features/expenses/screens/expense_wrapped_screen.dart';
+import '../../test_helper.dart';
 
 void main() {
+  setUpAll(() async {
+    await initializeSupabaseForTest();
+  });
+
   testWidgets('ExpenseWrappedScreen shows correct vibe for Foodie', (WidgetTester tester) async {
     final controller = ExpenseController();
     controller.handleInput('Spent 6000 on food');

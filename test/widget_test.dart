@@ -1,8 +1,12 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumina/main.dart';
+import 'test_helper.dart';
 
 void main() {
+  setUpAll(() async {
+    await initializeSupabaseForTest();
+  });
+
   testWidgets('Splash screen shows LUMINA', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const LuminaApp());

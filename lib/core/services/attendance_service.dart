@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/constants.dart';
 
 class AttendanceAnalytics {
@@ -67,9 +68,36 @@ class AttendanceRecord {
 }
 
 class AttendanceService extends ChangeNotifier {
+  final SupabaseClient _supabase = Supabase.instance.client;
   Map<String, AttendanceRecord> _records = {};
 
   Map<String, AttendanceRecord> get records => _records;
+
+  String? get _userId => _supabase.auth.currentUser?.id;
+
+  Future<void> fetchRecords() async {
+    final userId = _userId;
+    if (userId == null) return;
+
+    try {
+      final response = await _supabase
+          .from('attendance')
+          .select()
+          .eq('user_id', userId);
+
+      _records = {
+        for (final item in response)
+          item['subject'] as String: AttendanceRecord(
+            subject: item['subject'] as String,
+            attended: item['attended_count'] as int,
+            total: item['total_count'] as int,
+          )
+      };
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error fetching attendance records: $e');
+    }
+  }
 
   void loadDemoData() {
     _records = {};
@@ -80,6 +108,7 @@ class AttendanceService extends ChangeNotifier {
         total: data['total']!,
       );
     });
+    notifyListeners();
   }
 
   double get overallPercentage {
@@ -122,26 +151,79 @@ class AttendanceService extends ChangeNotifier {
     return needed.ceil().clamp(0, 999);
   }
 
-  void markAttended(String subject) {
+  Future<void> markAttended(String subject) async {
+    final userId = _userId;
+    if (userId == null) return;
+
     if (_records.containsKey(subject)) {
-      _records[subject]!.attended++;
-      _records[subject]!.total++;
+      final record = _records[subject]!;
+      final newAttended = record.attended + 1;
+      final newTotal = record.total + 1;
+
+      try {
+        await _supabase
+            .from('attendance')
+            .update({
+              'attended_count': newAttended,
+              'total_count': newTotal,
+            })
+            .match({'user_id': userId, 'subject': subject});
+
+        record.attended = newAttended;
+        record.total = newTotal;
+        notifyListeners();
+      } catch (e) {
+        debugPrint('Error marking attended: $e');
+      }
     }
   }
 
-  void markAbsent(String subject) {
+  Future<void> markAbsent(String subject) async {
+    final userId = _userId;
+    if (userId == null) return;
+
     if (_records.containsKey(subject)) {
-      _records[subject]!.total++;
+      final record = _records[subject]!;
+      final newTotal = record.total + 1;
+
+      try {
+        await _supabase
+            .from('attendance')
+            .update({
+              'total_count': newTotal,
+            })
+            .match({'user_id': userId, 'subject': subject});
+
+        record.total = newTotal;
+        notifyListeners();
+      } catch (e) {
+        debugPrint('Error marking absent: $e');
+      }
     }
   }
 
-  void addSubject(String subject) {
+  Future<void> addSubject(String subject) async {
+    final userId = _userId;
+    if (userId == null) return;
+
     if (!_records.containsKey(subject)) {
-      _records[subject] = AttendanceRecord(
-        subject: subject,
-        attended: 0,
-        total: 0,
-      );
+      try {
+        await _supabase.from('attendance').upsert({
+          'user_id': userId,
+          'subject': subject,
+          'attended_count': 0,
+          'total_count': 0,
+        });
+
+        _records[subject] = AttendanceRecord(
+          subject: subject,
+          attended: 0,
+          total: 0,
+        );
+        notifyListeners();
+      } catch (e) {
+        debugPrint('Error adding subject: $e');
+      }
     }
   }
 

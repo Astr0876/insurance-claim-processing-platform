@@ -1,7 +1,9 @@
+import 'package:uuid/uuid.dart';
 import '../models/transaction_model.dart';
 
 class ParserService {
   static TransactionModel parseMessage(String input) {
+    const uuid = Uuid();
     String lower = input.toLowerCase();
     
     // Default values
@@ -78,7 +80,7 @@ class ParserService {
     }
 
     return TransactionModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: uuid.v4(),
       amount: amount,
       category: category,
       type: type,

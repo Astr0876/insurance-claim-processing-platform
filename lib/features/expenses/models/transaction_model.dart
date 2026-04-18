@@ -39,6 +39,7 @@ class TransactionModel {
 
   Map<String, dynamic> toSupabase(String userId) {
     return {
+      'id': id,
       'user_id': userId,
       'amount': amount,
       'category': category,

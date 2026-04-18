@@ -3,8 +3,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/theme/neubrut_tokens.dart';
-import '../../core/widgets/nb_card.dart';
-import '../../core/widgets/nb_badge.dart';
 import '../../core/services/timetable_service.dart';
 import '../shared/widgets.dart';
 import 'import_review_screen.dart';

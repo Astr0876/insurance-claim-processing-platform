@@ -4,8 +4,6 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/theme/neubrut_tokens.dart';
 import '../../core/utils/helpers.dart';
-import '../../core/widgets/nb_card.dart';
-import '../../core/widgets/nb_badge.dart';
 import '../shared/widgets.dart';
 
 class FocusScreen extends StatefulWidget {
@@ -16,7 +14,6 @@ class FocusScreen extends StatefulWidget {
 }
 
 class _FocusScreenState extends State<FocusScreen> {
-  bool _isTracking = false;
 
   @override
   Widget build(BuildContext context) {
@@ -24,15 +21,16 @@ class _FocusScreenState extends State<FocusScreen> {
       builder: (context, state, _) {
         final focusScore  = state.focus.todayFocusScore;
         final studyMins   = state.focus.todayStudyMinutes;
-        final appSwitches = state.focus.todayAppSwitches;
-        final distractions = state.focus.todayDistractions;
+        final appSwitches = state.focus.isTracking ? state.focus.currentAppSwitches : state.focus.todayAppSwitches;
+        final distractions = state.focus.isTracking ? state.focus.currentDistractions : state.focus.todayDistractions;
         final weeklyScores = state.focus.weeklyScores;
         final focusColor   = NBColors.statusColor(focusScore);
 
         return CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            // ── Header ──────────────────────────────────────────
+            // ... (rest of the header)
+
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
@@ -119,13 +117,18 @@ class _FocusScreenState extends State<FocusScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                   child: _SessionButton(
-                    isTracking: _isTracking,
+                    isTracking: state.focus.isTracking,
                     onToggle: () {
-                      setState(() => _isTracking = !_isTracking);
+                      if (state.focus.isTracking) {
+                        state.focus.endSession();
+                      } else {
+                        state.focus.startSession(label: 'Study Session');
+                      }
+                      
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            _isTracking
+                            state.focus.isTracking
                                 ? 'Focus session ended!'
                                 : 'Focus session started! Stay focused 🎯',
                             style: const TextStyle(color: NBColors.black),
@@ -167,7 +170,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                 enabled: true,
                                 touchTooltipData: BarTouchTooltipData(
                                   getTooltipColor: (_) => NBColors.primary,
-                                  getTooltipItem: (group, _, rod, __) {
+                                  getTooltipItem: (group, _, rod, _) {
                                     return BarTooltipItem(
                                       '${rod.toY.round()}%',
                                       NBText.label.copyWith(

@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/theme/neubrut_tokens.dart';
-import '../../core/widgets/nb_card.dart';
-import '../../core/widgets/nb_badge.dart';
-import '../../core/widgets/nb_button.dart';
 import '../shared/widgets.dart';
 
 class AttendanceScreen extends StatelessWidget {

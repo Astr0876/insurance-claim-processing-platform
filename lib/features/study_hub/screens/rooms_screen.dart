@@ -6,12 +6,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/neubrut_tokens.dart';
-import '../../../core/widgets/nb_card.dart';
-import '../../../core/widgets/nb_badge.dart';
-import '../../../core/widgets/nb_button.dart';
-import '../../../core/widgets/nb_input.dart';
 import '../services/hub_service.dart';
 import '../models/hub_models.dart';
+import '../../shared/widgets.dart';
 import 'hub_room_screen.dart';
 
 class StudyHubRoomsScreen extends StatefulWidget {
@@ -34,7 +31,7 @@ class _StudyHubRoomsScreenState extends State<StudyHubRoomsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final svc = context.read<HubService>();
       svc.connect();
-      if (svc.myRooms.isEmpty) svc.loadDemoRooms();
+      svc.fetchMyRooms();
     });
   }
 
@@ -276,7 +273,7 @@ class _StudyHubRoomsScreenState extends State<StudyHubRoomsScreen> {
                   if (room != null && mounted) {
                     svc.enterRoom(room);
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const HubRoomScreen()));
-                  } else {
+                  } else if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Room not found. Check the code.')),
                     );

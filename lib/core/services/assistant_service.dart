@@ -35,7 +35,7 @@ class AssistantService extends ChangeNotifier {
   String _statusMessage = 'Lumina is offline';
 
   // Privacy Guard: Ensures zero network activity during RAG
-  bool _privacyGuardActive = true;
+  final bool _privacyGuardActive = true;
   bool get isPrivacyGuardActive => _privacyGuardActive;
 
   // Getters
@@ -174,8 +174,6 @@ class AssistantService extends ChangeNotifier {
       return "I've searched your notes locally but couldn't find a direct match for \"$query\". Try rephrasing or uploading more relevant materials!";
     }
     
-    final context = results.map((r) => r.snippet).join(' ');
-    
     // Simple synthesis rule: if it's a "what is" question, structure it as a definition
     if (lowerQuery.contains('what is') || lowerQuery.contains('define') || lowerQuery.contains('features')) {
       return "Based on your local document, here's a synthesis regarding \"$query\":\n\n${results.first.snippet.replaceAll('...', '').trim()}\n\nThis information is retrieved entirely from your offline storage.";
@@ -200,33 +198,45 @@ class AssistantService extends ChangeNotifier {
     }
 
     final buffer = StringBuffer()..writeln("Notes Reference:\n");
-    for (var res in results) buffer.writeln(res.snippet);
+    for (var res in results) {
+      buffer.writeln(res.snippet);
+    }
     return buffer.toString().trim();
   }
 
   List<SearchResult> _internalSearch(String query) {
-    if (!_hasDocument || query.trim().isEmpty) return [];
+    if (!_hasDocument || query.trim().isEmpty) {
+      return [];
+    }
     
     // Simulated TF.js local vectorization logic
     // We treat each paragraph as an "embedding" and compute similarity via keyword overlap (as a proxy)
     final queryWords = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.length >= 2).toList();
-    if (queryWords.isEmpty) return [];
+    if (queryWords.isEmpty) {
+      return [];
+    }
     
     final paragraphs = _documentContent.split(RegExp(r'\n\n+'));
     final results = <SearchResult>[];
     
     for (final para in paragraphs) {
-      if (para.trim().length < 10) continue;
+      if (para.trim().length < 10) {
+        continue;
+      }
       final paraLower = para.toLowerCase();
       int matchCount = 0;
       for (final word in queryWords) {
-        if (paraLower.contains(word)) matchCount++;
+        if (paraLower.contains(word)) {
+          matchCount++;
+        }
       }
       
       if (matchCount > 0) {
         // Boost relevance for title matches or start-of-para matches
         double relevance = matchCount / queryWords.length;
-        if (paraLower.startsWith(queryWords.first)) relevance += 0.2;
+        if (paraLower.startsWith(queryWords.first)) {
+          relevance += 0.2;
+        }
         
         String snippet = para.trim();
         if (snippet.length > 300) {

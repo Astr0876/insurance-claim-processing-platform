@@ -59,6 +59,15 @@ class StudyRoom {
         createdAt: j['createdAt'] ?? '',
       );
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'ownerId': ownerId,
+        'members': members.map((m) => m.toJson()).toList(),
+        'code': code,
+        'createdAt': createdAt,
+      };
+
   bool isAdmin(String userId) =>
       members.any((m) => m.userId == userId && m.role == 'admin');
   bool canEdit(String userId) =>
@@ -88,14 +97,25 @@ class HubMessage {
 
   factory HubMessage.fromJson(Map<String, dynamic> j) => HubMessage(
         id: j['id'] ?? '',
-        roomId: j['roomId'] ?? '',
-        senderId: j['senderId'] ?? '',
-        senderName: j['senderName'] ?? 'User',
+        roomId: j['roomId'] ?? j['room_id'] ?? '',
+        senderId: j['senderId'] ?? j['sender_id'] ?? '',
+        senderName: j['senderName'] ?? j['sender_name'] ?? 'User',
         content: j['content'] ?? '',
         type: j['type'] ?? 'text',
-        createdAt: j['createdAt'] ?? '',
+        createdAt: j['createdAt'] ?? j['created_at'] ?? '',
         readBy: List<String>.from(j['readBy'] ?? []),
       );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'roomId': roomId,
+        'senderId': senderId,
+        'senderName': senderName,
+        'content': content,
+        'type': type,
+        'createdAt': createdAt,
+        'readBy': readBy,
+      };
 
   bool get isSystem => type == 'system';
 }
@@ -119,6 +139,13 @@ class PresenceInfo {
         status: j['status'] ?? 'offline',
         lastSeen: j['lastSeen'] ?? '',
       );
+
+  Map<String, dynamic> toJson() => {
+        'userId': userId,
+        'userName': userName,
+        'status': status,
+        'lastSeen': lastSeen,
+      };
 }
 
 class HubPoll {
@@ -150,6 +177,16 @@ class HubPoll {
         createdAt: j['createdAt'] ?? '',
       );
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'roomId': roomId,
+        'creatorId': creatorId,
+        'question': question,
+        'yes': yes,
+        'no': no,
+        'createdAt': createdAt,
+      };
+
   int get totalVotes => yes.length + no.length;
   bool hasVoted(String userId) => yes.contains(userId) || no.contains(userId);
 }
@@ -179,6 +216,15 @@ class PinnedItem {
         label: j['label'] ?? 'Note',
         pinnedAt: j['pinnedAt'] ?? '',
       );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'userId': userId,
+        'itemType': itemType,
+        'content': content,
+        'label': label,
+        'pinnedAt': pinnedAt,
+      };
 }
 
 class ActivityItem {
@@ -203,6 +249,14 @@ class ActivityItem {
         metadata: Map<String, dynamic>.from(j['metadata'] ?? {}),
         timestamp: j['timestamp'] ?? '',
       );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'userId': userId,
+        'action': action,
+        'metadata': metadata,
+        'timestamp': timestamp,
+      };
 
   String get description {
     switch (action) {
@@ -250,6 +304,13 @@ class StudySession {
         startedAt: j['startedAt'] ?? '',
         activeUsers: List<String>.from(j['activeUsers'] ?? []),
       );
+
+  Map<String, dynamic> toJson() => {
+        'roomId': roomId,
+        'startedBy': startedBy,
+        'startedAt': startedAt,
+        'activeUsers': activeUsers,
+      };
 
   Duration get elapsed => DateTime.now().difference(DateTime.tryParse(startedAt) ?? DateTime.now());
   String get elapsedFormatted {

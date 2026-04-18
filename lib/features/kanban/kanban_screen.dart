@@ -153,7 +153,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
             },
             groupItemBuilder: (context, groupId, itemIndex) {
               final group = findGroup(groupId);
-              final task = group.items[itemIndex!];
+              final task = group.items[itemIndex];
               
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: NBSpacing.md, vertical: NBSpacing.xs),

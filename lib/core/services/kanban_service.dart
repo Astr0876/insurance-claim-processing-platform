@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kanban_board/kanban_board.dart';
@@ -88,6 +89,7 @@ class KanbanService extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
   List<KanbanTask> _tasks = [];
   bool _isLoading = false;
+  StreamSubscription<List<Map<String, dynamic>>>? _tasksSubscription;
 
   List<KanbanTask> get tasks => _tasks;
   bool get isLoading => _isLoading;
@@ -102,6 +104,9 @@ class KanbanService extends ChangeNotifier {
 
     _isLoading = true;
     notifyListeners();
+
+    // Start real-time subscription
+    subscribeToTasks();
 
     try {
       final response = await _supabase
@@ -119,9 +124,27 @@ class KanbanService extends ChangeNotifier {
     }
   }
 
+  void subscribeToTasks() {
+    final user = _supabase.auth.currentUser;
+    if (user == null || _tasksSubscription != null) return;
+
+    debugPrint('PROGRESS ENGINE: Subscribing to Kanban Realtime Updates...');
+    
+    _tasksSubscription = _supabase
+        .from('kanban_tasks')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', user.id)
+        .order('created_at', ascending: false)
+        .listen((List<Map<String, dynamic>> data) {
+          _tasks = data.map((t) => KanbanTask.fromSupabase(t)).toList();
+          notifyListeners();
+          debugPrint('PROGRESS ENGINE: Received ${data.length} tasks from remote.');
+        }, onError: (error) {
+          debugPrint('PROGRESS ENGINE: Realtime Error: $error');
+        });
+  }
+
   void loadDemoData() {
-    // Demo data logic can be kept for fallback or removed
-    // For now, we'll just call fetchTasks if user is logged in
     fetchTasks();
   }
 
@@ -136,7 +159,7 @@ class KanbanService extends ChangeNotifier {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
 
-    final newTask = {
+    final newTaskData = {
       'user_id': user.id,
       'title': title,
       'description': description,
@@ -147,9 +170,20 @@ class KanbanService extends ChangeNotifier {
     };
 
     try {
-      final response = await _supabase.from('kanban_tasks').insert(newTask).select().single();
-      _tasks.insert(0, KanbanTask.fromSupabase(response));
-      notifyListeners();
+      // Optimistic local add (optional, but good for UX)
+      // Since stream will catch the insert, we might skip manual list management here
+      // but let's do a simple optimistic insert for instant feel.
+      // However, we don't have the ID yet. 
+      // Supabase's insert with .select().single() is fast enough.
+      
+      final response = await _supabase.from('kanban_tasks').insert(newTaskData).select().single();
+      // We don't strictly need to add to _tasks manually if stream is active, 
+      // but it helps if stream is slow.
+      final newTask = KanbanTask.fromSupabase(response);
+      if (!_tasks.any((t) => t.taskId == newTask.taskId)) {
+        _tasks.insert(0, newTask);
+        notifyListeners();
+      }
     } catch (e) {
       debugPrint('Error adding task: $e');
     }
@@ -167,21 +201,33 @@ class KanbanService extends ChangeNotifier {
       final oldTask = _tasks[index];
       if (oldTask.status == newStatus) return;
 
+      // --- OPTIMISTIC UPDATE (Offline Graceful Handling) ---
+      final updatedTask = oldTask.copyWith(status: newStatus);
+      _tasks[index] = updatedTask;
+      notifyListeners();
+      
+      if (!isRemote) {
+        debugPrint('PROGRESS ENGINE: Task $taskId moved to $newStatus (Optimistic)');
+      }
+
       try {
         await _supabase
             .from('kanban_tasks')
             .update({'status': newStatus.toShortString()})
             .eq('id', taskId);
-
-        _tasks[index] = oldTask.copyWith(status: newStatus);
         
-        if (!isRemote) {
-          debugPrint('PROGRESS ENGINE: Task $taskId moved to $newStatus');
-        }
-        
-        notifyListeners();
+        // Success: State is already correct due to optimism.
       } catch (e) {
         debugPrint('Error updating task status: $e');
+        
+        // --- ROLLBACK (Offline Recovery) ---
+        // If the update fails (e.g. offline), we revert to the old status
+        // and notify listeners so the UI snaps back.
+        final reIndex = _tasks.indexWhere((t) => t.id == taskId);
+        if (reIndex != -1) {
+          _tasks[reIndex] = oldTask;
+          notifyListeners();
+        }
       }
     }
   }
@@ -195,4 +241,11 @@ class KanbanService extends ChangeNotifier {
       debugPrint('Error deleting task: $e');
     }
   }
+
+  @override
+  void dispose() {
+    _tasksSubscription?.cancel();
+    super.dispose();
+  }
 }
+

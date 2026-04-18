@@ -6,8 +6,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/neubrut_tokens.dart';
-import '../../../../core/widgets/nb_card.dart';
-import '../../../../core/widgets/nb_button.dart';
 import '../../../../core/widgets/nb_badge.dart';
 import '../../services/hub_service.dart';
 

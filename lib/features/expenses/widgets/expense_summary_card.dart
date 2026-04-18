@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/neubrut_tokens.dart';
 import '../../../core/widgets/nb_card.dart';
-import '../models/transaction_model.dart';
 import '../controllers/expense_controller.dart';
 import 'category_badge.dart';
 

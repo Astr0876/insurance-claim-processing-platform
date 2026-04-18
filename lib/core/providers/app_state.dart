@@ -6,7 +6,9 @@ import '../services/assistant_service.dart';
 import '../services/kanban_service.dart';
 import '../services/latex_service.dart';
 import '../services/calendar_service.dart';
+import '../services/ai_model_service.dart';
 import '../../features/expenses/controllers/expense_controller.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/home_widget_service.dart';
 
 class HomeWidgetSnapshot {
@@ -14,12 +16,14 @@ class HomeWidgetSnapshot {
   final String nextClassTime;
   final double attendancePercentage;
   final String riskLabel;
+  final int upcomingDeadlinesCount;
 
   const HomeWidgetSnapshot({
     required this.nextClassLabel,
     required this.nextClassTime,
     required this.attendancePercentage,
     required this.riskLabel,
+    required this.upcomingDeadlinesCount,
   });
 }
 
@@ -32,12 +36,35 @@ class AppState extends ChangeNotifier {
   final LaTeXService latex = LaTeXService();
   final ExpenseController expenses = ExpenseController();
   final CalendarService calendar = CalendarService();
+  final AIModelService aiModels = AIModelService();
 
   AppState() {
     assistant.addListener(notifyListeners);
     expenses.addListener(notifyListeners);
     latex.addListener(notifyListeners);
     calendar.addListener(notifyListeners);
+    aiModels.addListener(notifyListeners);
+    
+    // Listen for auth changes to fetch data
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.session != null) {
+        // User logged in: Fetch all data
+        timetable.fetchTimetable();
+        attendance.fetchRecords();
+        kanban.fetchTasks();
+        focus.fetchSessions();
+        expenses.fetchTransactions();
+      } else {
+        // Clear records on sign out
+        _studentName = 'Student';
+        _isInitialized = false;
+        timetable.loadDemoData(); 
+        attendance.loadDemoData();
+        kanban.loadDemoData();
+        focus.loadDemoData();
+        expenses.clearAll();
+      }
+    });
   }
 
   bool _isInitialized = false;
@@ -48,6 +75,7 @@ class AppState extends ChangeNotifier {
     nextClassTime: '--',
     attendancePercentage: 100,
     riskLabel: 'LOW',
+    upcomingDeadlinesCount: 0,
   );
   HomeWidgetSnapshot get widgetSnapshot => _widgetSnapshot;
 
@@ -80,27 +108,49 @@ class AppState extends ChangeNotifier {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    timetable.loadDemoData();
-    attendance.loadDemoData();
-    focus.loadDemoData();
-    assistant.loadDemoDocument();
-    await _refreshWidgetSnapshot();
-    kanban.loadDemoData();
-    latex.loadDemoData();
-    calendar.loadDemoData();
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      // 1. Fetch data from Supabase in parallel
+      await Future.wait([
+        timetable.fetchTimetable(),
+        attendance.fetchRecords(),
+        kanban.fetchTasks(),
+        focus.fetchSessions(),
+        expenses.fetchTransactions(),
+      ]);
+      
+      // 2. Fetch profile info
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('student_name')
+          .eq('id', user.id)
+          .maybeSingle();
+      
+      if (profile != null) {
+        _studentName = profile['student_name'] ?? 'Student';
+      }
+    } else {
+      // Not logged in: Show demo data for trial (optional)
+      timetable.loadDemoData();
+      attendance.loadDemoData();
+      kanban.loadDemoData();
+      focus.loadDemoData();
+      calendar.loadDemoData();
+    }
 
+    await _refreshWidgetSnapshot();
     _isInitialized = true;
     notifyListeners();
   }
 
   Future<void> markAttended(String subject) async {
-    attendance.markAttended(subject);
+    await attendance.markAttended(subject);
     await _refreshWidgetSnapshot();
     notifyListeners();
   }
 
   Future<void> markAbsent(String subject) async {
-    attendance.markAbsent(subject);
+    await attendance.markAbsent(subject);
     await _refreshWidgetSnapshot();
     notifyListeners();
   }
@@ -168,19 +218,38 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _refreshWidgetSnapshot() async {
-    final nextClass = timetable.getNextClass();
-    final attendancePct = attendance.overallPercentage;
-    final risk = attendancePct < 60
+    String nextClassLabel = 'No class';
+    String nextClassTime = '--';
+    double attendancePct = attendance.overallPercentage;
+    String risk = attendancePct < 60
         ? 'HIGH'
         : attendancePct < 75
-        ? 'MEDIUM'
-        : 'LOW';
+            ? 'MEDIUM'
+            : 'LOW';
+    int deadlinesCount = kanban.todoTasks.length;
+
+    try {
+      // 1. Next Class from Timetable Service
+      final nextClass = timetable.getNextClass();
+      if (nextClass != null) {
+        nextClassLabel = nextClass.subject;
+        nextClassTime = nextClass.time;
+      }
+
+      // 2. If logged in, we could potentially fetch the very latest from DB, 
+      // but services should already be updated by initialize() or other methods.
+      // So we rely on service state which is the "source of truth" in the app.
+      
+    } catch (e) {
+      debugPrint('Error refreshing widget snapshot: $e');
+    }
 
     final newSnapshot = HomeWidgetSnapshot(
-      nextClassLabel: nextClass?.subject ?? 'No class',
-      nextClassTime: nextClass?.time ?? '--',
+      nextClassLabel: nextClassLabel,
+      nextClassTime: nextClassTime,
       attendancePercentage: attendancePct,
       riskLabel: risk,
+      upcomingDeadlinesCount: deadlinesCount,
     );
 
     _widgetSnapshot = newSnapshot;

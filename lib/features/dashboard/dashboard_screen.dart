@@ -3,10 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/theme/neubrut_tokens.dart';
 import '../../core/utils/helpers.dart';
-import '../../core/widgets/nb_card.dart';
-import '../../core/widgets/nb_badge.dart';
 import '../shared/widgets.dart';
-import '../latex/latex_preview_screen.dart';
 import 'package:intl/intl.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -415,7 +412,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: calendar.deadlines.take(3).length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, index) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
                     final d = calendar.deadlines[index];
                     final isClose = d.date.difference(DateTime.now()).inDays <= 1;
@@ -804,7 +801,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     final safeBunks = state.attendance.totalSafeBunks;
     final classesToRecover = state.attendance.classesToRecover;
     final overallPct = state.attendance.overallPercentage;
-    final statusColor = NBColors.statusColor(overallPct);
     final isGood = overallPct >= 75;
 
     return Padding(

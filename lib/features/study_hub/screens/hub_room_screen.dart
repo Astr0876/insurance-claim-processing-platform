@@ -6,10 +6,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/neubrut_tokens.dart';
-import '../../../core/widgets/nb_card.dart';
-import '../../../core/widgets/nb_badge.dart';
-import '../../../core/widgets/nb_button.dart';
 import '../services/hub_service.dart';
+import '../models/hub_models.dart';
 import 'tabs/chat_tab.dart';
 import 'tabs/canvas_tab.dart';
 import 'tabs/activity_tab.dart';
@@ -212,7 +210,7 @@ class _HubRoomScreenState extends State<HubRoomScreen>
     );
   }
 
-  Widget _presenceAvatar(p) {
+  Widget _presenceAvatar(PresenceInfo p) {
     Color statusColor;
     switch (p.status) {
       case 'active':  statusColor = NBColors.green;  break;
@@ -234,7 +232,7 @@ class _HubRoomScreenState extends State<HubRoomScreen>
             ),
             child: Center(
               child: Text(
-                (p.userName as String).substring(0, 1).toUpperCase(),
+                p.userName.substring(0, 1).toUpperCase(),
                 style: NBText.label.copyWith(fontSize: 12),
               ),
             ),

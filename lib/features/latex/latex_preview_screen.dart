@@ -5,6 +5,7 @@ import '../../core/providers/app_state.dart';
 import '../../core/theme/neubrut_tokens.dart';
 import '../../core/widgets/nb_card.dart';
 import '../../core/widgets/nb_button.dart';
+import '../../core/services/latex_service.dart';
 
 class LaTeXPreviewScreen extends StatefulWidget {
   const LaTeXPreviewScreen({super.key});
@@ -76,7 +77,7 @@ class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
     );
   }
 
-  Widget _buildEditor(latex) {
+  Widget _buildEditor(LaTeXService latex) {
     return Stack(
       children: [
         Padding(
@@ -131,7 +132,7 @@ class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
     );
   }
 
-  Widget _buildPreview(latex, report) {
+  Widget _buildPreview(LaTeXService latex, LaTeXReport? report) {
     return Column(
       children: [
         // Info Bar
@@ -260,7 +261,7 @@ class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
     );
   }
 
-  void _showAiAssistDialog(latex) {
+  void _showAiAssistDialog(LaTeXService latex) {
     final controller = TextEditingController();
     showDialog(
       context: context,

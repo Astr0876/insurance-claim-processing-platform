@@ -1,7 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumina/core/services/attendance_service.dart';
+import '../../test_helper.dart';
 
 void main() {
+  setUpAll(() async {
+    await initializeSupabaseForTest();
+  });
+
   group('AttendanceRecord formulas', () {
     test('computes classes needed to reach target', () {
       final record = AttendanceRecord(subject: 'OS', attended: 14, total: 20);

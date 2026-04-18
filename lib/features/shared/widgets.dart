@@ -1,15 +1,5 @@
-/// shared/widgets.dart
-///
-/// Re-exports from the NB design system so every existing screen
-/// that imports this file keeps compiling without changes.
-/// Also contains AnimatedPercentageRing, StatChip, SectionHeader –
-/// all refactored to Neubrutalism aesthetics.
-
-library shared_widgets;
-
 import 'package:flutter/material.dart';
 import '../../core/theme/neubrut_tokens.dart';
-import '../../core/theme/app_theme.dart';
 export '../../core/widgets/nb_card.dart';
 export '../../core/widgets/nb_button.dart';
 export '../../core/widgets/nb_input.dart';

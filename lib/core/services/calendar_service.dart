@@ -1,4 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:googleapis/calendar/v3.dart' as calendar_api;
+import 'package:googleapis/gmail/v1.dart' as gmail_api;
+import 'package:http/http.dart' as http;
+
+class GoogleAuthClient extends http.BaseClient {
+  final Map<String, String> _headers;
+  final http.Client _client = http.Client();
+
+  GoogleAuthClient(this._headers);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    return _client.send(request..headers.addAll(_headers));
+  }
+}
 
 class AcademicDeadline {
   final String title;
@@ -17,8 +33,15 @@ class AcademicDeadline {
 enum StressState { green, yellow, red }
 
 class CalendarService extends ChangeNotifier {
-  List<AcademicDeadline> _deadlines = [];
+  final List<AcademicDeadline> _deadlines = [];
   bool _isSyncing = false;
+
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: [
+      calendar_api.CalendarApi.calendarScope,
+      gmail_api.GmailApi.gmailReadonlyScope,
+    ],
+  );
 
   List<AcademicDeadline> get deadlines => _deadlines;
   bool get isSyncing => _isSyncing;
@@ -36,7 +59,8 @@ class CalendarService extends ChangeNotifier {
 
   void loadDemoData() {
     final now = DateTime.now();
-    _deadlines = [
+    _deadlines.clear();
+    _deadlines.addAll([
       AcademicDeadline(
         title: 'OS Lab Viva',
         date: now.add(const Duration(days: 1)),
@@ -55,7 +79,7 @@ class CalendarService extends ChangeNotifier {
         source: 'Manual',
         keyword: 'Quiz',
       ),
-    ];
+    ]);
     notifyListeners();
   }
 
@@ -63,38 +87,77 @@ class CalendarService extends ChangeNotifier {
     _isSyncing = true;
     notifyListeners();
 
-    // Simulate API delay
-    await Future.delayed(const Duration(seconds: 3));
-
-    final now = DateTime.now();
-    // Simulate finding new deadlines in "emails"
-    final newDeadlines = [
-      AcademicDeadline(
-        title: 'Data Structures Lab Submission',
-        date: now.add(const Duration(days: 2)),
-        source: 'Gmail',
-        keyword: 'Submission',
-      ),
-      AcademicDeadline(
-        title: 'Computer Networks Exam',
-        date: now.add(const Duration(days: 7)),
-        source: 'Gmail',
-        keyword: 'Exam',
-      ),
-    ];
-
-    for (var d in newDeadlines) {
-      if (!_deadlines.any((existing) => existing.title == d.title)) {
-        _deadlines.add(d);
+    try {
+      final account = await _googleSignIn.signIn();
+      if (account == null) {
+        _isSyncing = false;
+        notifyListeners();
+        return; // User canceled
       }
-    }
 
-    _isSyncing = false;
-    notifyListeners();
+      final authHeaders = await account.authHeaders;
+      final authClient = GoogleAuthClient(authHeaders);
+
+      final gmailClient = gmail_api.GmailApi(authClient);
+      final calClient = calendar_api.CalendarApi(authClient);
+
+      // 1. SCAN GMAIL FOR DEADLINES
+      final String query = "${academicKeywords.map((kw) => 'subject:$kw').join(' OR ')} newer_than:7d";
+      final response = await gmailClient.users.messages.list('me', q: query);
+
+      final messages = response.messages ?? [];
+      final now = DateTime.now();
+
+      for (var msg in messages) {
+        if (msg.id == null) {
+          continue;
+        }
+        final fullMessage = await gmailClient.users.messages.get('me', msg.id!);
+        final snippet = fullMessage.snippet ?? 'Academic Deadline';
+        
+        // Simple regex to extract dates could go here. For now, simulate +2 days.
+        final simulatedDate = now.add(const Duration(days: 2));
+
+        final deadline = AcademicDeadline(
+          title: snippet.length > 40 ? '${snippet.substring(0, 40)}...' : snippet,
+          date: simulatedDate,
+          source: 'Gmail',
+          keyword: academicKeywords.firstWhere(
+            (kw) => snippet.toLowerCase().contains(kw.toLowerCase()),
+            orElse: () => 'Deadline',
+          ),
+        );
+
+        if (!_deadlines.any((existing) => existing.title == deadline.title)) {
+          _deadlines.add(deadline);
+
+          // 2. PUSH TO GOOGLE CALENDAR
+          final event = calendar_api.Event(
+            summary: '⚠️ LUMINA DEADLINE: ${deadline.title}',
+            start: calendar_api.EventDateTime(dateTime: simulatedDate),
+            end: calendar_api.EventDateTime(dateTime: simulatedDate.add(const Duration(hours: 1))),
+            colorId: '11', // Red color
+          );
+
+          try {
+            await calClient.events.insert(event, 'primary');
+          } catch (e) {
+            debugPrint('Failed to sync to GCal: $e');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error syncing Gmail/Calendar: $e');
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
+    }
   }
 
   StressState get stressState {
-    if (_deadlines.isEmpty) return StressState.green;
+    if (_deadlines.isEmpty) {
+      return StressState.green;
+    }
 
     // Logic: if 3+ deadlines collide on a single day -> Red
     final Map<String, int> collisionMap = {};
@@ -104,13 +167,17 @@ class CalendarService extends ChangeNotifier {
     }
 
     bool hasTripleCollision = collisionMap.values.any((count) => count >= 3);
-    if (hasTripleCollision) return StressState.red;
+    if (hasTripleCollision) {
+      return StressState.red;
+    }
 
     // Logic: if week is clear -> Green
     final nextWeek = DateTime.now().add(const Duration(days: 7));
     bool hasDeadlinesThisWeek = _deadlines.any((d) => d.date.isBefore(nextWeek));
     
-    if (!hasDeadlinesThisWeek) return StressState.green;
+    if (!hasDeadlinesThisWeek) {
+      return StressState.green;
+    }
 
     return StressState.yellow;
   }
@@ -129,9 +196,13 @@ class CalendarService extends ChangeNotifier {
       final date = DateTime.parse(dateStr);
       // Intensity: 1-2 = 0.4, 3 = 0.7, 4+ = 1.0
       double intensity = 0.0;
-      if (count >= 4) intensity = 1.0;
-      else if (count == 3) intensity = 0.7;
-      else if (count >= 1) intensity = 0.4;
+      if (count >= 4) {
+        intensity = 1.0;
+      } else if (count == 3) {
+        intensity = 0.7;
+      } else if (count >= 1) {
+        intensity = 0.4;
+      }
       heatmap[date] = intensity;
     });
 
@@ -139,14 +210,18 @@ class CalendarService extends ChangeNotifier {
   }
 
   double get deadlineProximityScore {
-    if (_deadlines.isEmpty) return 0;
+    if (_deadlines.isEmpty) {
+      return 0;
+    }
     
     final now = DateTime.now();
     double totalProximity = 0;
     
     for (var d in _deadlines) {
       final diff = d.date.difference(now).inDays;
-      if (diff < 0) continue; // Past deadline
+      if (diff < 0) {
+        continue; // Past deadline
+      }
       
       // Closer the deadline, higher the score
       // 0 days = 100 points, 7 days = 0 points

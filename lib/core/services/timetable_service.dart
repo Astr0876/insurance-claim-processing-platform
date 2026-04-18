@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
-
 import '../utils/constants.dart';
 
 enum TimetableImportType { pdf, image }
@@ -207,33 +207,11 @@ class _PdfTextExtractionAdapter implements _TimetableTextExtractionAdapter {
 class _ImageTextExtractionAdapter implements _TimetableTextExtractionAdapter {
   @override
   Future<_TextExtractionResult> extract(String filePath) async {
-    // SIMULATED ON-DEVICE OCR LOGIC
-    await Future.delayed(const Duration(seconds: 2)); // Simulate processing time
-
-    // Predefined OCR output for a sample timetable image
-    const mockOcrText = '''
-    Monday:
-    9:00 AM - 10:00 AM: Data Structures (LH-201)
-    11:00 AM - 12:00 PM: Operating Systems (LH-305)
-    
-    Tuesday:
-    9:00 AM - 10:00 AM: Computer Networks (LH-101)
-    1:00 PM - 2:00 PM: Mathematics III (LH-102)
-    
-    Wednesday:
-    10:00 AM - 11:00 AM: Operating Systems (LH-305)
-    12:00 PM - 1:00 PM: Software Engineering (LH-201)
-    
-    Thursday:
-    9:00 AM - 10:00 AM: Mathematics III (LH-102)
-    2:00 PM - 3:00 PM: Data Structures (LH-201)
-    
-    Friday:
-    9:00 AM - 10:00 AM: Software Engineering (LH-201)
-    11:00 AM - 12:00 PM: Operating Systems (LH-305)
-    ''';
-
-    return _TextExtractionResult.success(mockOcrText);
+    // Image-based OCR implementation is currently not available.
+    // In a real app, this would use a package like google_mlkit_text_recognition.
+    return _TextExtractionResult.failure(
+      'Image OCR extraction is not yet implemented. Please import using a PDF file.',
+    );
   }
 }
 
@@ -441,22 +419,51 @@ class TimetableService extends ChangeNotifier {
   bool get isLoaded => _isLoaded;
   String get lastRawExtractedText => _lastRawExtractedText;
 
-  void loadDemoData() {
-    _schedule = AppConstants.demoTimetable.map((dayData) {
-      return DaySchedule(
-        day: dayData['day'] as String,
-        classes: (dayData['classes'] as List).map((c) {
-          final classMap = c as Map<String, dynamic>;
-          return TimetableEntry(
-            subject: classMap['subject'] as String,
-            time: classMap['time'] as String,
-            room: classMap['room'] as String,
-            durationMinutes: classMap['duration'] as int,
-          );
-        }).toList(),
-      );
-    }).toList();
-    _isLoaded = true;
+  Future<void> fetchTimetable() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      _isLoaded = false;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final response = await client
+          .from('timetable_entries')
+          .select()
+          .eq('user_id', user.id);
+
+      final List<ParsedClassSlot> slots = [];
+      for (final row in response as List<dynamic>) {
+        final startTime12 = row['start_time'] as String;
+        final duration = row['duration_minutes'] as int? ?? 60;
+        final startTime24 = parser._to24h(startTime12) ?? '00:00';
+        
+        final startMins = parser._minutesOf(startTime24) ?? 0;
+        final endMins = startMins + duration;
+        final endH = (endMins ~/ 60) % 24;
+        final endM = endMins % 60;
+        final endTime24 = '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
+
+        slots.add(ParsedClassSlot(
+          day: row['day'] as String,
+          startTime24: startTime24,
+          endTime24: endTime24,
+          subject: row['subject'] as String,
+          room: row['room'] as String? ?? 'TBA',
+          durationMinutes: duration,
+          confidence: 1.0,
+          sourceLine: 'Database entry',
+        ));
+      }
+
+      applyImportedSchedule(slots);
+    } catch (e) {
+      debugPrint('Error fetching timetable: $e');
+      _isLoaded = false;
+      notifyListeners();
+    }
   }
 
   Future<TimetableImportResult> importTimetableFile({
@@ -525,6 +532,7 @@ class TimetableService extends ChangeNotifier {
         )
         .toList();
     _isLoaded = true;
+    notifyListeners();
   }
 
   DaySchedule? getTodaySchedule() {
@@ -579,6 +587,25 @@ class TimetableService extends ChangeNotifier {
     daySchedule.classes.add(entry);
     daySchedule.classes.sort(_compareEntryByTime);
     _isLoaded = true;
+    notifyListeners();
+  }
+
+  void loadDemoData() {
+    _schedule = AppConstants.demoTimetable.map((dayData) {
+      final String day = dayData['day'];
+      final List<dynamic> classesData = dayData['classes'];
+      final List<TimetableEntry> classes = classesData.map((c) {
+        return TimetableEntry(
+          subject: c['subject'],
+          time: c['time'],
+          room: c['room'],
+          durationMinutes: c['duration'],
+        );
+      }).toList();
+      return DaySchedule(day: day, classes: classes);
+    }).toList();
+    _isLoaded = true;
+    notifyListeners();
   }
 
   int _compareEntryByTime(TimetableEntry a, TimetableEntry b) {
@@ -588,7 +615,7 @@ class TimetableService extends ChangeNotifier {
   }
 
   int? _minutesFromDisplayTime(String time) {
-    final parser = TimetableTextParser();
+    final parser = this.parser;
     final hhmm = parser._to24h(time);
     if (hhmm == null) return null;
     return parser._minutesOf(hhmm);

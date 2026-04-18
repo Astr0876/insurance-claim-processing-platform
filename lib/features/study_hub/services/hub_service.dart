@@ -1,33 +1,27 @@
 // ─────────────────────────────────────────────────────────────────
 //  lib/features/study_hub/services/hub_service.dart
-//  REST + Socket.io service for Collaborative Study Hub
-//  Falls back to local simulation if server is unreachable.
+//  REST + Supabase Realtime service for Collaborative Study Hub
+//  Falls back to local simulation if Supabase is unreachable.
 // ─────────────────────────────────────────────────────────────────
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/hub_models.dart';
 
-/// Change to your LAN/hosted IP when testing on a physical device
-const String kServerBase = 'http://10.0.2.2:3000'; // emulator → localhost
-// const String kServerBase = 'http://localhost:3000'; // web / desktop
-
 class HubService extends ChangeNotifier {
-  // ── Socket ───────────────────────────────────────────────────────
-  IO.Socket? _socket;
-  bool get isConnected => _socket?.connected ?? false;
+  // ── Supabase ────────────────────────────────────────────────────
+  final _supabase = Supabase.instance.client;
+  RealtimeChannel? _hubChannel;
+  bool get isConnected => _hubChannel != null;
 
-  // ── Identity (demo: no auth needed) ──────────────────────────────
-  String userId   = 'user_${Random().nextInt(9999)}';
-  String userName = 'Student';
+  // ── Identity (Supabase) ──────────────────────────────────────────
+  String get userId => _supabase.auth.currentUser?.id ?? 'user_anonymous';
+  String get userName => _supabase.auth.currentUser?.userMetadata?['student_name'] ?? 'Student';
 
   void setIdentity(String id, String name) {
-    userId   = id;
-    userName = name;
+    // Identity is now primarily derived from Supabase Auth
   }
 
   // ── State ─────────────────────────────────────────────────────────
@@ -46,20 +40,14 @@ class HubService extends ChangeNotifier {
   int               codeVersion  = 0;
 
   // --- Study Squads Flow Trend ---
-  List<double> _flowTrend = [];
+  final List<double> _flowTrend = [];
   List<double> get flowTrend => List.unmodifiable(_flowTrend);
 
   void updateFlowTrend(List<double> rawScores) {
-    // Anonymization logic: We only take the average or normalized values,
-    // losing individual identity in the squad chart.
     if (rawScores.isEmpty) return;
-    
-    // Average score for the squad in this time bucket
     final avg = rawScores.reduce((a, b) => a + b) / rawScores.length;
-    
     _flowTrend.add(avg);
     if (_flowTrend.length > 50) _flowTrend.removeAt(0);
-    
     notifyListeners();
   }
 
@@ -80,145 +68,118 @@ class HubService extends ChangeNotifier {
 
   void connect() {
     try {
-      _socket = IO.io(kServerBase, IO.OptionBuilder()
-          .setTransports(['websocket'])
-          .disableAutoConnect()
-          .build());
+      // Initialize Supabase Realtime Channel
+      _hubChannel = _supabase.channel('public:hub_messages');
 
-      _socket!.connect();
-      _bindSocketEvents();
+      // 1. Subscribe to INSERT events for the hub_messages table
+      _hubChannel!.onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'hub_messages',
+        callback: (payload) {
+          final record = payload.newRecord;
+          if (currentRoom != null && record['room_id'] == currentRoom!.id) {
+            final sId = record['sender_id']?.toString() ?? '';
+            
+            // Try to resolve sender name from current room members
+            String sName = 'Student';
+            if (currentRoom != null) {
+              final member = currentRoom!.members.firstWhere(
+                (m) => m.userId == sId,
+                orElse: () => RoomMember(userId: sId, name: 'Student', role: 'viewer', joinedAt: ''),
+              );
+              sName = member.name;
+            }
 
-      // Heartbeat every 30s
-      _presenceTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-        if (currentRoom != null) {
-          _socket?.emit('presence_ping', {
-            'roomId': currentRoom!.id,
-            'userId': userId,
-            'status': 'active',
-          });
+            final msg = HubMessage(
+              id: record['id']?.toString() ?? '',
+              roomId: record['room_id']?.toString() ?? '',
+              senderId: sId,
+              senderName: sName,
+              content: record['content']?.toString() ?? '',
+              type: record['type']?.toString() ?? 'text',
+              createdAt: record['created_at']?.toString() ?? '',
+              readBy: [],
+            );
+            
+            // Avoid duplicate additions if echo already added it
+            if (!messages.any((m) => m.id == msg.id)) {
+              messages.add(msg);
+              notifyListeners();
+            }
+          }
+        },
+      ).subscribe();
+
+      // 2. Listen for other realtime updates via Broadcast
+      _hubChannel!.onBroadcast(event: 'typing', callback: (data) {
+        final uid = data['userId'] as String;
+        final isTyping = data['isTyping'] as bool;
+        if (uid != userId) {
+          if (isTyping) {
+            typingUsers[uid] = true;
+          } else {
+            typingUsers.remove(uid);
+          }
+          notifyListeners();
         }
       });
-    } catch (e) {
-      debugPrint('HubService: socket connect error $e');
-    }
-  }
 
-  void _bindSocketEvents() {
-    _socket!.on('connect',    (_) { notifyListeners(); });
-    _socket!.on('disconnect', (_) { notifyListeners(); });
+      _hubChannel!.onBroadcast(event: 'doc_update', callback: (data) {
+        final incomingVersion = data['version'] ?? 0;
+        if (incomingVersion >= docVersion) {
+          docContent = data['content'] ?? '';
+          docVersion = incomingVersion;
+          notifyListeners();
+        }
+      });
 
-    _socket!.on('room_state', (data) {
-      messages    = _parseMessages(data['messages']);
-      presence    = _parsePresence(data['presence']);
-      polls       = _parsePolls(data['polls']);
-      pinnedItems = _parsePins(data['pinnedItems']);
-      activities  = _parseActivities(data['activity']);
-      sketches    = (data['sketches'] as List? ?? []).cast<Map<String, dynamic>>();
-      if (data['doc'] != null) {
-        docContent = data['doc']['content'] ?? '';
-        docVersion = data['doc']['version'] ?? 0;
-      }
-      if (data['code'] != null) {
-        codeContent = data['code']['content'] ?? '';
-        codeVersion = data['code']['version'] ?? 0;
-      }
-      if (data['studySession'] != null) {
-        studySession = StudySession.fromJson(data['studySession']);
-      }
-      notifyListeners();
-    });
+      _hubChannel!.onBroadcast(event: 'code_update', callback: (data) {
+        final incomingVersion = data['version'] ?? 0;
+        if (incomingVersion >= codeVersion) {
+          codeContent = data['content'] ?? '';
+          codeVersion = incomingVersion;
+          notifyListeners();
+        }
+      });
 
-    _socket!.on('receive_message', (data) {
-      messages.add(HubMessage.fromJson(Map<String, dynamic>.from(data)));
-      notifyListeners();
-    });
-
-    _socket!.on('typing', (data) {
-      final uid = data['userId'] as String;
-      final isTyping = data['isTyping'] as bool;
-      if (uid != userId) {
-        if (isTyping) {
-          typingUsers[uid] = true;
+      _hubChannel!.onBroadcast(event: 'sketch', callback: (data) {
+        if (data['data']?['action'] == 'clear') {
+          sketches.clear();
         } else {
-          typingUsers.remove(uid);
+          sketches.add(Map<String, dynamic>.from(data));
         }
         notifyListeners();
-      }
-    });
+      });
 
-    _socket!.on('presence_update', (data) {
-      final list = data['presence'] as List;
-      presence = list.map((p) => PresenceInfo.fromJson(Map<String, dynamic>.from(p))).toList();
-      notifyListeners();
-    });
-
-    _socket!.on('doc_update', (data) {
-      final incomingVersion = data['version'] ?? 0;
-      if (incomingVersion >= docVersion) {
-        docContent = data['content'] ?? '';
-        docVersion = incomingVersion;
+      _hubChannel!.onBroadcast(event: 'poll_update', callback: (data) {
+        final poll = HubPoll.fromJson(Map<String, dynamic>.from(data['poll']));
+        final idx  = polls.indexWhere((p) => p.id == poll.id);
+        if (idx >= 0) {
+          polls[idx] = poll;
+        } else {
+          polls.add(poll);
+        }
         notifyListeners();
-      }
-    });
+      });
 
-    _socket!.on('code_update', (data) {
-      final incomingVersion = data['version'] ?? 0;
-      if (incomingVersion >= codeVersion) {
-        codeContent = data['content'] ?? '';
-        codeVersion = incomingVersion;
+      _hubChannel!.onBroadcast(event: 'session_update', callback: (data) {
+        if (data['active'] == false) {
+          studySession = null;
+          _sessionTimer?.cancel();
+          _sessionTick = 0;
+        } else {
+          studySession = StudySession.fromJson(Map<String, dynamic>.from(data));
+          _startSessionTick();
+        }
         notifyListeners();
-      }
-    });
+      });
 
-    _socket!.on('sketch', (data) {
-      final payload = Map<String, dynamic>.from(data);
-      if (payload['data']?['action'] == 'clear') {
-        sketches.clear();
-      } else {
-        sketches.add(payload);
-      }
       notifyListeners();
-    });
 
-    _socket!.on('poll_update', (data) {
-      final poll = HubPoll.fromJson(Map<String, dynamic>.from(data['poll']));
-      final idx  = polls.indexWhere((p) => p.id == poll.id);
-      if (idx >= 0) polls[idx] = poll; else polls.add(poll);
-      notifyListeners();
-    });
-
-    _socket!.on('pin_update', (data) {
-      final pin = PinnedItem.fromJson(Map<String, dynamic>.from(data));
-      pinnedItems.insert(0, pin);
-      notifyListeners();
-    });
-
-    _socket!.on('session_update', (data) {
-      if (data == null) {
-        studySession = null;
-        _sessionTimer?.cancel();
-        _sessionTick = 0;
-      } else {
-        studySession = StudySession.fromJson(Map<String, dynamic>.from(data));
-        _startSessionTick();
-      }
-      notifyListeners();
-    });
-
-    _socket!.on('activity_update', (data) {
-      final item = ActivityItem.fromJson(Map<String, dynamic>.from(data));
-      activities.insert(0, item);
-      if (activities.length > 50) activities.removeLast();
-      notifyListeners();
-    });
-
-    _socket!.on('read_receipt', (data) {
-      final mid = data['messageId'] as String;
-      final uid = data['userId'] as String;
-      final msg = messages.firstWhere((m) => m.id == mid, orElse: () => messages.first);
-      if (!msg.readBy.contains(uid)) msg.readBy.add(uid);
-      notifyListeners();
-    });
+    } catch (e) {
+      debugPrint('HubService: Supabase connect error $e');
+    }
   }
 
   void _startSessionTick() {
@@ -233,53 +194,137 @@ class HubService extends ChangeNotifier {
   //  ROOM ACTIONS
   // ─────────────────────────────────────────────────────────────────
 
+  Future<void> fetchMyRooms() async {
+    _isLoading = true;
+    notifyListeners();
+    errorMessage = null;
+
+    try {
+      final currentUserId = userId;
+      if (currentUserId == 'user_anonymous') {
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+
+      final List<dynamic> allData = await _supabase
+          .from('study_rooms')
+          .select('*, room_members(*)');
+
+      myRooms = allData.where((room) {
+        final members = room['room_members'] as List;
+        return members.any((m) => m['user_id'] == currentUserId);
+      }).map((roomData) {
+        final Map<String, dynamic> mappedData = {
+          'id': roomData['id'].toString(),
+          'name': roomData['name'],
+          'code': roomData['code'],
+          'ownerId': roomData['owner_id'],
+          'createdAt': roomData['created_at'],
+          'members': (roomData['room_members'] as List).map((m) => {
+            'userId': m['user_id'],
+            'name': m['user_name'] ?? 'User',
+            'role': m['role'],
+            'joinedAt': m['joined_at'],
+          }).toList(),
+        };
+        return StudyRoom.fromJson(mappedData);
+      }).toList();
+
+    } catch (e) {
+      debugPrint('Error fetching rooms: $e');
+      loadDemoRooms();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<StudyRoom?> createRoom(String name) async {
-    _isLoading = true; notifyListeners();
+    _isLoading = true;
+    notifyListeners();
     errorMessage = null;
     try {
-      final res = await http.post(
-        Uri.parse('$kServerBase/rooms/create'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'name': name, 'ownerId': userId, 'ownerName': userName}),
-      );
-      if (res.statusCode == 200) {
-        final room = StudyRoom.fromJson(jsonDecode(res.body)['room']);
-        myRooms.add(room);
-        _isLoading = false; notifyListeners();
-        return room;
-      }
+      final code = _randomCode();
+      final currentUserId = userId;
+      final currentUserName = userName;
+
+      final roomResult = await _supabase.from('study_rooms').insert({
+        'name': name,
+        'code': code,
+        'owner_id': currentUserId,
+      }).select().single();
+
+      final roomId = roomResult['id'];
+
+      await _supabase.from('room_members').insert({
+        'room_id': roomId,
+        'user_id': currentUserId,
+        'user_name': currentUserName,
+        'role': 'admin',
+      });
+
+      await fetchMyRooms();
+      _isLoading = false;
+      notifyListeners();
+      return myRooms.firstWhere((r) => r.id == roomId);
     } catch (e) {
-      // Demo fallback
-      final room = _makeDemoRoom(name);
-      myRooms.add(room);
-      _isLoading = false; notifyListeners();
-      return room;
+      debugPrint('Error creating room: $e');
+      errorMessage = 'Failed to create room';
     }
-    _isLoading = false; notifyListeners();
+    _isLoading = false;
+    notifyListeners();
     return null;
   }
 
   Future<StudyRoom?> joinRoom(String code) async {
-    _isLoading = true; notifyListeners();
+    _isLoading = true;
+    notifyListeners();
     errorMessage = null;
     try {
-      final res = await http.post(
-        Uri.parse('$kServerBase/rooms/join'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'code': code, 'userId': userId, 'userName': userName}),
-      );
-      if (res.statusCode == 200) {
-        final room = StudyRoom.fromJson(jsonDecode(res.body)['room']);
-        if (!myRooms.any((r) => r.id == room.id)) myRooms.add(room);
-        _isLoading = false; notifyListeners();
-        return room;
-      } else {
+      final roomMatch = await _supabase
+          .from('study_rooms')
+          .select()
+          .eq('code', code.toUpperCase())
+          .maybeSingle();
+
+      if (roomMatch == null) {
         errorMessage = 'Room not found';
+        _isLoading = false;
+        notifyListeners();
+        return null;
       }
+
+      final roomId = roomMatch['id'];
+      final currentUserId = userId;
+      final currentUserName = userName;
+
+      final existingMember = await _supabase
+          .from('room_members')
+          .select()
+          .eq('room_id', roomId)
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+
+      if (existingMember == null) {
+        await _supabase.from('room_members').insert({
+          'room_id': roomId,
+          'user_id': currentUserId,
+          'user_name': currentUserName,
+          'role': 'viewer',
+        });
+      }
+
+      await fetchMyRooms();
+      _isLoading = false;
+      notifyListeners();
+      return myRooms.firstWhere((r) => r.id == roomId);
     } catch (e) {
-      errorMessage = 'Server unreachable';
+      debugPrint('Error joining room: $e');
+      errorMessage = 'Failed to join room';
     }
-    _isLoading = false; notifyListeners();
+    _isLoading = false;
+    notifyListeners();
     return null;
   }
 
@@ -295,13 +340,7 @@ class HubService extends ChangeNotifier {
     studySession = null;
     notifyListeners();
 
-    if (isConnected) {
-      _socket?.emit('join_room', {
-        'roomId': room.id,
-        'userId': userId,
-        'userName': userName,
-      });
-    } else {
+    if (!isConnected) {
       _loadDemoState(room.id);
     }
   }
@@ -316,17 +355,20 @@ class HubService extends ChangeNotifier {
   //  MESSAGING
   // ─────────────────────────────────────────────────────────────────
 
-  void sendMessage(String content, {String type = 'text'}) {
+  Future<void> sendMessage(String content, {String type = 'text'}) async {
     if (currentRoom == null) return;
-    final data = {
-      'roomId': currentRoom!.id,
-      'senderId': userId,
-      'senderName': userName,
-      'content': content,
-      'type': type,
-    };
+
     if (isConnected) {
-      _socket?.emit('send_message', data);
+      try {
+        await _supabase.from('hub_messages').insert({
+          'room_id': currentRoom!.id,
+          'sender_id': userId,
+          'content': content,
+          'type': type,
+        });
+      } catch (e) {
+        debugPrint('Error sending message: $e');
+      }
     } else {
       // Demo local echo
       messages.add(HubMessage(
@@ -346,12 +388,19 @@ class HubService extends ChangeNotifier {
 
   void sendTyping(bool isTyping) {
     if (currentRoom == null || !isConnected) return;
-    _socket?.emit('typing', {
-      'roomId': currentRoom!.id,
-      'userId': userId,
-      'userName': userName,
-      'isTyping': isTyping,
-    });
+    try {
+      _hubChannel?.sendBroadcastMessage(
+        event: 'typing',
+        payload: {
+          'roomId': currentRoom!.id,
+          'userId': userId,
+          'userName': userName,
+          'isTyping': isTyping,
+        },
+      );
+    } catch (e) {
+      debugPrint('Broadcast error: $e');
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────
@@ -363,12 +412,15 @@ class HubService extends ChangeNotifier {
     docVersion++;
     if (currentRoom == null) return;
     if (isConnected) {
-      _socket?.emit('doc_update', {
-        'roomId': currentRoom!.id,
-        'userId': userId,
-        'content': content,
-        'version': docVersion,
-      });
+      _hubChannel?.sendBroadcastMessage(
+        event: 'doc_update',
+        payload: {
+          'roomId': currentRoom!.id,
+          'userId': userId,
+          'content': content,
+          'version': docVersion,
+        },
+      );
     }
     notifyListeners();
   }
@@ -378,12 +430,15 @@ class HubService extends ChangeNotifier {
     codeVersion++;
     if (currentRoom == null) return;
     if (isConnected) {
-      _socket?.emit('code_update', {
-        'roomId': currentRoom!.id,
-        'userId': userId,
-        'content': content,
-        'version': codeVersion,
-      });
+      _hubChannel?.sendBroadcastMessage(
+        event: 'code_update',
+        payload: {
+          'roomId': currentRoom!.id,
+          'userId': userId,
+          'content': content,
+          'version': codeVersion,
+        },
+      );
     }
     notifyListeners();
   }
@@ -391,13 +446,15 @@ class HubService extends ChangeNotifier {
   void sendSketch(Map<String, dynamic> data) {
     if (currentRoom == null) return;
     if (isConnected) {
-      _socket?.emit('sketch', {
-        'roomId': currentRoom!.id,
-        'userId': userId,
-        'data': data,
-      });
+      _hubChannel?.sendBroadcastMessage(
+        event: 'sketch',
+        payload: {
+          'roomId': currentRoom!.id,
+          'userId': userId,
+          'data': data,
+        },
+      );
     }
-    // Locally add it
     if (data['action'] == 'clear') {
       sketches.clear();
     } else {
@@ -425,11 +482,10 @@ class HubService extends ChangeNotifier {
     notifyListeners();
 
     if (isConnected) {
-      _socket?.emit('poll_create', {
-        'roomId': currentRoom!.id,
-        'creatorId': userId,
-        'question': question,
-      });
+      _hubChannel?.sendBroadcastMessage(
+        event: 'poll_update',
+        payload: {'poll': poll.toJson()},
+      );
     }
   }
 
@@ -437,17 +493,18 @@ class HubService extends ChangeNotifier {
     final poll = polls.firstWhere((p) => p.id == pollId);
     poll.yes.remove(userId);
     poll.no.remove(userId);
-    if (vote == 'yes') poll.yes.add(userId);
-    else poll.no.add(userId);
+    if (vote == 'yes') {
+      poll.yes.add(userId);
+    } else {
+      poll.no.add(userId);
+    }
     notifyListeners();
 
     if (isConnected) {
-      _socket?.emit('poll_vote', {
-        'roomId': currentRoom!.id,
-        'pollId': pollId,
-        'userId': userId,
-        'vote': vote,
-      });
+      _hubChannel?.sendBroadcastMessage(
+        event: 'poll_update',
+        payload: {'poll': poll.toJson()},
+      );
     }
   }
 
@@ -485,7 +542,10 @@ class HubService extends ChangeNotifier {
     notifyListeners();
 
     if (isConnected) {
-      _socket?.emit('session_start', {'roomId': currentRoom!.id, 'userId': userId});
+      _hubChannel?.sendBroadcastMessage(
+        event: 'session_update',
+        payload: studySession!.toJson(),
+      );
     }
   }
 
@@ -496,7 +556,10 @@ class HubService extends ChangeNotifier {
     notifyListeners();
 
     if (isConnected) {
-      _socket?.emit('session_stop', {'roomId': currentRoom!.id, 'userId': userId});
+      _hubChannel?.sendBroadcastMessage(
+        event: 'session_update',
+        payload: {'active': false},
+      );
     }
   }
 
@@ -507,12 +570,14 @@ class HubService extends ChangeNotifier {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  //  INSIGHTS (computed)
+  //  INSIGHTS
   // ─────────────────────────────────────────────────────────────────
 
   String get mostActiveUser {
     final counts = <String, int>{};
-    for (final m in messages) { if (!m.isSystem) counts[m.senderName] = (counts[m.senderName] ?? 0) + 1; }
+    for (final m in messages) {
+      if (!m.isSystem) counts[m.senderName] = (counts[m.senderName] ?? 0) + 1;
+    }
     if (counts.isEmpty) return '—';
     return counts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
   }
@@ -520,7 +585,7 @@ class HubService extends ChangeNotifier {
   int get totalMessages => messages.where((m) => !m.isSystem).length;
 
   // ─────────────────────────────────────────────────────────────────
-  //  DEMO FALLBACK (when server is offline)
+  //  DEMO FALLBACK
   // ─────────────────────────────────────────────────────────────────
 
   void loadDemoRooms() {
@@ -578,36 +643,15 @@ class HubService extends ChangeNotifier {
   void _addDemoReply() {
     Future.delayed(const Duration(milliseconds: 1200), () {
       if (currentRoom == null) return;
-      final replies = [
-        "Great point! Let me add that to the notes.",
-        "Can someone explain this concept? 🤔",
-        "I got it now, thanks!",
-        "Should we take a 5-min break?",
-        "Added to the pinned notes already.",
-      ];
+      final replies = ["Great point!", "Can someone explain this concept? 🤔", "I got it now, thanks!", "Break?"];
       messages.add(HubMessage(
-        id: _uid(),
-        roomId: currentRoom!.id,
-        senderId: 'u2',
-        senderName: 'Priya',
-        content: replies[Random().nextInt(replies.length)],
-        type: 'text',
-        createdAt: DateTime.now().toIso8601String(),
-        readBy: [],
+        id: _uid(), roomId: currentRoom!.id, senderId: 'u2', senderName: 'Priya',
+        content: replies[Random().nextInt(replies.length)], type: 'text',
+        createdAt: DateTime.now().toIso8601String(), readBy: [],
       ));
       notifyListeners();
     });
   }
-
-  // ─────────────────────────────────────────────────────────────────
-  //  HELPERS
-  // ─────────────────────────────────────────────────────────────────
-
-  List<HubMessage>  _parseMessages(dynamic data)    => (data as List? ?? []).map((e) => HubMessage.fromJson(Map<String, dynamic>.from(e))).toList();
-  List<PresenceInfo> _parsePresence(dynamic data)   => (data as List? ?? []).map((e) => PresenceInfo.fromJson(Map<String, dynamic>.from(e))).toList();
-  List<HubPoll>     _parsePolls(dynamic data)       => (data as List? ?? []).map((e) => HubPoll.fromJson(Map<String, dynamic>.from(e))).toList();
-  List<PinnedItem>  _parsePins(dynamic data)        => (data as List? ?? []).map((e) => PinnedItem.fromJson(Map<String, dynamic>.from(e))).toList();
-  List<ActivityItem> _parseActivities(dynamic data) => (data as List? ?? []).map((e) => ActivityItem.fromJson(Map<String, dynamic>.from(e))).toList();
 
   String _uid() => DateTime.now().microsecondsSinceEpoch.toString() + Random().nextInt(999).toString();
   String _randomCode() => (100000 + Random().nextInt(899999)).toString().substring(0, 6).toUpperCase();
@@ -617,7 +661,7 @@ class HubService extends ChangeNotifier {
   void dispose() {
     _presenceTimer?.cancel();
     _sessionTimer?.cancel();
-    _socket?.disconnect();
+    _hubChannel?.unsubscribe();
     super.dispose();
   }
 }

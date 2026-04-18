@@ -8,7 +8,6 @@ import '../../../../core/theme/neubrut_tokens.dart';
 import '../../../../core/widgets/nb_card.dart';
 import '../../../../core/widgets/nb_badge.dart';
 import '../../services/hub_service.dart';
-import '../../models/hub_models.dart';
 
 class ActivityTab extends StatelessWidget {
   final HubService svc;

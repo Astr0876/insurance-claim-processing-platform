@@ -1,10 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lumina/features/study_hub/services/hub_service.dart';
 import 'package:lumina/features/study_hub/models/hub_models.dart';
+import '../../test_helper.dart';
 
 void main() {
   group('HubService Tests', () {
     late HubService svc;
+
+    setUpAll(() async {
+      await initializeSupabaseForTest();
+    });
 
     setUp(() {
       svc = HubService();

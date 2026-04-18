@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/theme/neubrut_tokens.dart';
-import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import '../../core/services/assistant_service.dart';
 
@@ -215,6 +214,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     // Upload button
                     GestureDetector(
                       onTap: () async {
+                        final messenger = ScaffoldMessenger.of(context);
                         try {
                           final result = await FilePicker.pickFiles(
                             type: FileType.custom,
@@ -227,7 +227,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                           }
                         } catch (e) {
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            messenger.showSnackBar(
                               const SnackBar(content: Text('Error selecting file')),
                             );
                           }

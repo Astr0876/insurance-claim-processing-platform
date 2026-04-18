@@ -9,6 +9,7 @@ import 'core/theme/neubrut_tokens.dart';
 import 'core/utils/constants.dart';
 import 'app/app_shell.dart';
 import 'features/study_hub/services/hub_service.dart';
+import 'features/auth/screens/auth_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,9 +37,6 @@ class LuminaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // DEV TIP: Change this to 'true' to skip the splash screen entirely
-    const bool skipSplash = false;
-
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppState()..initialize()),
@@ -48,7 +46,7 @@ class LuminaApp extends StatelessWidget {
         title: 'LockIn',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        home: skipSplash ? const AppShell() : const SplashScreen(),
+        home: const SplashScreen(),
       ),
     );
   }
@@ -91,9 +89,12 @@ class _SplashScreenState extends State<SplashScreen>
 
     Future.delayed(const Duration(milliseconds: 2000), () {
       if (mounted) {
+        final session = Supabase.instance.client.auth.currentSession;
+        final targetScreen = session != null ? const AppShell() : const AuthScreen();
+
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
-            pageBuilder: (context, animation, _) => const AppShell(),
+            pageBuilder: (context, animation, _) => targetScreen,
             transitionsBuilder: (context, animation, _, child) =>
                 FadeTransition(opacity: animation, child: child),
             transitionDuration: const Duration(milliseconds: 400),

@@ -191,7 +191,7 @@ class _ExpenseWrappedScreenState extends State<ExpenseWrappedScreen> {
                 ),
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
