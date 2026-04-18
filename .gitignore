@@ -48,3 +48,5 @@ _bmad
 _bmad-output
 .gemini
 .github
+
+.env
