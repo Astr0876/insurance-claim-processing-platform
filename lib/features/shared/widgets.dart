@@ -102,7 +102,7 @@ class StatChip extends StatelessWidget {
         vertical: NBSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: NBColors.white,
         border: Border.all(color: NBColors.black, width: 2),
         borderRadius: NBRadius.softAll,
         boxShadow: NBShadows.small,

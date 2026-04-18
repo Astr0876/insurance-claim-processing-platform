@@ -42,12 +42,16 @@ class AttendanceScreen extends StatelessWidget {
                       Text('Track & Optimize', style: NBText.heading1),
                       const SizedBox(height: 4),
                       Container(
-                        color: NBColors.black,
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: NBColors.primary,
+                          border: Border.all(color: NBColors.black, width: 1.5),
+                          borderRadius: NBRadius.softAll,
+                        ),
                         child: Text(
                           'your attendance record',
                           style: NBText.label.copyWith(
-                            color: NBColors.white,
+                            color: NBColors.black,
                             fontSize: 10,
                           ),
                         ),

@@ -135,8 +135,9 @@ class _FocusScreenState extends State<FocusScreen> {
                             _isTracking
                                 ? 'Focus session ended!'
                                 : 'Focus session started! Stay focused 🎯',
+                            style: const TextStyle(color: NBColors.black),
                           ),
-                          backgroundColor: NBColors.black,
+                          backgroundColor: NBColors.primary,
                           behavior: SnackBarBehavior.floating,
                           shape: const RoundedRectangleBorder(
                             borderRadius: NBRadius.softAll,
@@ -172,12 +173,12 @@ class _FocusScreenState extends State<FocusScreen> {
                               barTouchData: BarTouchData(
                                 enabled: true,
                                 touchTooltipData: BarTouchTooltipData(
-                                  getTooltipColor: (_) => NBColors.black,
+                                  getTooltipColor: (_) => NBColors.primary,
                                   getTooltipItem: (group, _, rod, __) {
                                     return BarTooltipItem(
                                       '${rod.toY.round()}%',
                                       NBText.label.copyWith(
-                                        color: NBColors.white,
+                                        color: NBColors.black,
                                       ),
                                     );
                                   },

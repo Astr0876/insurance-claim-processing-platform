@@ -152,11 +152,15 @@ class _DashboardScreenState extends State<DashboardScreen>
           const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            color: NBColors.black,
+            decoration: BoxDecoration(
+              color: NBColors.primary,
+              border: Border.all(color: NBColors.black, width: 1.5),
+              borderRadius: NBRadius.softAll,
+            ),
             child: Text(
               'Your Proactive Student Sidekick',
               style: NBText.label.copyWith(
-                color: NBColors.white,
+                color: NBColors.black,
                 letterSpacing: 1.5,
                 fontSize: 10,
               ),
@@ -394,8 +398,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                 const SizedBox(width: 6),
                 NBBadge(
                   label: '$todayCount classes today',
-                  fillColor: NBColors.black,
-                  textColor: NBColors.white,
+                  fillColor: NBColors.white,
+                  textColor: NBColors.black,
                 ),
               ],
             ),

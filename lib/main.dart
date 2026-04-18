@@ -138,13 +138,14 @@ class _SplashScreenState extends State<SplashScreen>
                         vertical: NBSpacing.xs,
                       ),
                       decoration: BoxDecoration(
-                        color: NBColors.black,
+                        color: NBColors.primary,
+                        border: Border.all(color: NBColors.black, width: 2),
                         borderRadius: NBRadius.softAll,
                       ),
                       child: Text(
                         'Your Proactive Student Sidekick',
                         style: NBText.label.copyWith(
-                          color: NBColors.white,
+                          color: NBColors.black,
                           fontSize: 11,
                           letterSpacing: 1.5,
                         ),

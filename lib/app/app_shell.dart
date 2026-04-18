@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../core/providers/app_state.dart';
 import '../../core/theme/neubrut_tokens.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/timetable/timetable_screen.dart';
+import '../../features/kanban/kanban_screen.dart';
 import '../../features/attendance/attendance_screen.dart';
 import '../../features/focus/focus_screen.dart';
 import '../../features/assistant/assistant_screen.dart';
@@ -26,6 +25,7 @@ class _AppShellState extends State<AppShell> {
   static const _navItems = [
     (Icons.dashboard_rounded,       'Home'),
     (Icons.calendar_month_rounded,  'Schedule'),
+    (Icons.view_kanban_rounded,     'Kanban'),
     (Icons.fact_check_rounded,      'Attend'),
     (Icons.psychology_rounded,      'Focus'),
     (Icons.smart_toy_rounded,       'Ask AI'),
@@ -40,6 +40,7 @@ class _AppShellState extends State<AppShell> {
         children: [
           DashboardScreen(onNavigate: _onNavigate),
           const TimetableScreen(),
+          const KanbanScreen(),
           const AttendanceScreen(),
           const FocusScreen(),
           const AssistantScreen(),
@@ -54,11 +55,14 @@ class _AppShellState extends State<AppShell> {
       decoration: BoxDecoration(
         color: NBColors.white,
         border: const Border(
-          top: BorderSide(color: NBColors.black, width: 2),
+          top: BorderSide(color: NBColors.black, width: 1.5),
         ),
-        // Hard shadow going up
-        boxShadow: const [
-          BoxShadow(color: NBColors.black, offset: Offset(0, -3), blurRadius: 0),
+        boxShadow: [
+          BoxShadow(
+            color: NBColors.black.withValues(alpha: 0.1),
+            offset: const Offset(0, -4),
+            blurRadius: 10,
+          ),
         ],
       ),
       child: SafeArea(

@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../core/providers/app_state.dart';
+import '../../core/services/assistant_service.dart';
 import '../../core/theme/neubrut_tokens.dart';
 import '../../core/widgets/nb_card.dart';
 
 class ChatMessage {
-  final String text;
+  String text;
   final bool isUser;
   final DateTime timestamp;
+  final bool isStreaming;
 
   ChatMessage({
     required this.text,
     required this.isUser,
     DateTime? timestamp,
+    this.isStreaming = false,
   }) : timestamp = timestamp ?? DateTime.now();
 }
 
@@ -34,11 +38,8 @@ class _AssistantScreenState extends State<AssistantScreen> {
     super.initState();
     _messages.add(ChatMessage(
       text: "👋 Hi! I'm LUMINA's Offline Semantic Assistant.\n\n"
-            "I can answer questions from your study materials. Demo notes on "
-            "Data Structures, OS, Networks, DBMS, and Software Engineering are "
-            "pre-loaded.\n\nTry asking:\n• \"What are stacks?\"\n"
-            "• \"Explain deadlocks\"\n• \"What is TCP?\"\n"
-            "• \"What are design patterns?\"",
+            "I can answer questions from your study materials. Demo notes are pre-loaded.\n\n"
+            "Try the new **Lumina RAG** mode for smarter, synthesized answers using your local second brain!",
       isUser: false,
     ));
   }
@@ -61,15 +62,32 @@ class _AssistantScreenState extends State<AssistantScreen> {
     _controller.clear();
     _scrollToBottom();
 
-    await Future.delayed(const Duration(milliseconds: 600));
-
     final state = Provider.of<AppState>(context, listen: false);
-    final answer = state.assistant.getAnswer(text);
+    final assistant = state.assistant;
 
-    setState(() {
-      _messages.add(ChatMessage(text: answer, isUser: false));
-      _isTyping = false;
-    });
+    if (assistant.mode == AssistantMode.standard) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      final answer = assistant.getAnswer(text);
+      setState(() {
+        _messages.add(ChatMessage(text: answer, isUser: false));
+        _isTyping = false;
+      });
+    } else {
+      // RAG Streaming mode
+      setState(() {
+        _isTyping = false;
+        _messages.add(ChatMessage(text: "...", isUser: false, isStreaming: true));
+      });
+      
+      final currentMessage = _messages.last;
+      await for (final token in assistant.getAnswerStream(text)) {
+        setState(() {
+          currentMessage.text = token;
+        });
+        _scrollToBottom();
+      }
+    }
+    
     _scrollToBottom();
   }
 
@@ -87,90 +105,189 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final state = Provider.of<AppState>(context);
+    final assistant = state.assistant;
+
     return Scaffold(
       backgroundColor: NBColors.bg,
       body: Column(
         children: [
           // ── Header ────────────────────────────────────────────────
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 60, 20, 16),
-            decoration: const BoxDecoration(
-              color: NBColors.primary,
-              border: Border(
+            padding: const EdgeInsets.fromLTRB(20, 50, 20, 16),
+            decoration: BoxDecoration(
+              color: assistant.mode == AssistantMode.luminaRag 
+                  ? const Color(0xFFE1BEE7) // Soft Purple for RAG
+                  : NBColors.primary,
+              border: const Border(
                 bottom: BorderSide(color: NBColors.black, width: 2),
               ),
             ),
-            child: Row(
+            child: Column(
               children: [
-                // Bot icon box
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: NBColors.black,
-                    border: Border.all(color: NBColors.black, width: 2),
-                    borderRadius: NBRadius.softAll,
-                    boxShadow: NBShadows.small,
-                  ),
-                  child: const Icon(
-                    Icons.smart_toy_rounded,
-                    color: NBColors.white,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'SEMANTIC ASSISTANT',
-                        style: NBText.label.copyWith(
-                          fontSize: 14,
-                          letterSpacing: 2,
-                        ),
+                Row(
+                  children: [
+                    // Bot icon box
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: NBColors.white,
+                        border: Border.all(color: NBColors.black, width: 2),
+                        borderRadius: NBRadius.softAll,
+                        boxShadow: NBShadows.small,
                       ),
-                      Row(
+                      child: Icon(
+                        assistant.mode == AssistantMode.luminaRag 
+                            ? Icons.psychology_rounded
+                            : Icons.smart_toy_rounded,
+                        color: NBColors.black,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            color: NBColors.green,
-                            margin: const EdgeInsets.only(right: 6),
-                          ),
                           Text(
-                            'OFFLINE • NOTES LOADED',
-                            style: NBText.label.copyWith(fontSize: 9),
+                            assistant.mode == AssistantMode.luminaRag 
+                                ? 'LUMINA RAG'
+                                : 'SEMANTIC ASSISTANT',
+                            style: NBText.label.copyWith(
+                              fontSize: 14,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                color: assistant.mode == AssistantMode.luminaRag 
+                                    ? Colors.purple
+                                    : NBColors.green,
+                                margin: const EdgeInsets.only(right: 6),
+                              ),
+                              Text(
+                                assistant.mode == AssistantMode.luminaRag 
+                                    ? 'LOCAL BRAIN • OFFLINE'
+                                    : 'QUICK SEARCH • OFFLINE',
+                                style: NBText.label.copyWith(fontSize: 9),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                    // Clear button
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _messages.clear();
+                          _messages.add(ChatMessage(
+                            text: 'Memory wiped. Ask me anything! 🧠',
+                            isUser: false,
+                          ));
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: NBColors.white,
+                          border: Border.all(color: NBColors.black, width: 2),
+                          borderRadius: NBRadius.softAll,
+                          boxShadow: NBShadows.small,
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: NBColors.black,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Upload button
+                    GestureDetector(
+                      onTap: () async {
+                        final state = Provider.of<AppState>(context, listen: false);
+                        try {
+                          final result = await FilePicker.pickFiles(
+                            type: FileType.custom,
+                            allowedExtensions: ['pdf', 'txt'],
+                          );
+
+                          if (result != null && result.files.single.path != null) {
+                            final fileName = result.files.single.name;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Indexing $fileName into Local Brain...'),
+                                backgroundColor: Colors.purple,
+                              ),
+                            );
+                            
+                            // Simulate reading the file content
+                            // In a real app, you'd use a PDF parser like syncfusion_flutter_pdf
+                            await Future.delayed(const Duration(seconds: 2));
+                            
+                            state.assistant.loadDocument("Content from $fileName: This is a deep dive into the subject matter of $fileName. It covers key concepts, definitions, and advanced theories that Lumina can now use to answer your queries offline.");
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('$fileName Indexed! ✨'),
+                                  backgroundColor: NBColors.green,
+                                ),
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Error selecting file')),
+                            );
+                          }
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: NBColors.white,
+                          border: Border.all(color: NBColors.black, width: 2),
+                          borderRadius: NBRadius.softAll,
+                          boxShadow: NBShadows.small,
+                        ),
+                        child: const Icon(
+                          Icons.picture_as_pdf_rounded,
+                          color: NBColors.black,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                // Clear button
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _messages.clear();
-                      _messages.add(ChatMessage(
-                        text: 'Chat cleared. Ask me anything! 📚',
-                        isUser: false,
-                      ));
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: NBColors.white,
-                      border: Border.all(color: NBColors.black, width: 2),
-                      borderRadius: NBRadius.softAll,
-                      boxShadow: NBShadows.small,
+                const SizedBox(height: 12),
+                // ── Mode Switcher ─────────────────────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ModeButton(
+                        label: 'Standard',
+                        icon: Icons.search_rounded,
+                        isSelected: assistant.mode == AssistantMode.standard,
+                        onTap: () => assistant.setMode(AssistantMode.standard),
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.refresh_rounded,
-                      color: NBColors.black,
-                      size: 20,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _ModeButton(
+                        label: 'Lumina RAG',
+                        icon: Icons.auto_awesome_rounded,
+                        isSelected: assistant.mode == AssistantMode.luminaRag,
+                        onTap: () => assistant.setMode(AssistantMode.luminaRag),
+                        isSpecial: true,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -190,25 +307,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
               },
             ),
           ),
-
-          // ── Quick suggestions ─────────────────────────────────────
-          if (_messages.length <= 2)
-            Container(
-              color: NBColors.bg,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _quickChip('What are stacks?'),
-                  _quickChip('Explain TCP/IP'),
-                  _quickChip('What is deadlock?'),
-                  _quickChip('SQL joins'),
-                  _quickChip('Design patterns'),
-                  _quickChip('Binary search tree'),
-                ],
-              ),
-            ),
 
           // ── Input area ────────────────────────────────────────────
           Container(
@@ -234,16 +332,18 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     child: TextField(
                       controller: _controller,
                       style: NBText.body,
-                      decoration: const InputDecoration(
-                        hintText: 'Ask about your notes...',
-                        hintStyle: TextStyle(
+                      decoration: InputDecoration(
+                        hintText: assistant.mode == AssistantMode.luminaRag 
+                            ? 'Query your local brain...' 
+                            : 'Ask about your notes...',
+                        hintStyle: const TextStyle(
                           color: Color(0xFF888888),
                           fontWeight: FontWeight.w500,
                         ),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(
+                        contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14,
                           vertical: 12,
                         ),
@@ -263,8 +363,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
     );
   }
 
-  // ── Message bubble ────────────────────────────────────────────────
-
   Widget _buildMessageBubble(ChatMessage message) {
     final isUser = message.isUser;
 
@@ -275,37 +373,51 @@ class _AssistantScreenState extends State<AssistantScreen> {
         mainAxisAlignment:
             isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
-          // AI avatar
           if (!isUser)
             Container(
               margin: const EdgeInsets.only(right: 8, top: 2),
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: NBColors.black,
+                color: NBColors.white,
                 border: Border.all(color: NBColors.black, width: 2),
                 borderRadius: NBRadius.softAll,
                 boxShadow: NBShadows.small,
               ),
-              child: const Icon(
-                Icons.smart_toy_rounded,
-                color: NBColors.white,
+              child: Icon(
+                message.isStreaming ? Icons.psychology_rounded : Icons.smart_toy_rounded,
+                color: NBColors.black,
                 size: 16,
               ),
             ),
 
-          // Message card
           Flexible(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: isUser ? NBColors.primary : NBColors.white,
+                color: isUser 
+                    ? NBColors.primary 
+                    : (message.isStreaming ? const Color(0xFFF3E5F5) : NBColors.white),
                 border: Border.all(color: NBColors.black, width: 2),
                 borderRadius: NBRadius.softAll,
                 boxShadow: NBShadows.small,
               ),
-              child: Text(
-                message.text,
-                style: NBText.body.copyWith(height: 1.5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message.text,
+                    style: NBText.body.copyWith(height: 1.5),
+                  ),
+                  if (message.isStreaming && message.text.contains("Thinking"))
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: LinearProgressIndicator(
+                        backgroundColor: Colors.transparent,
+                        color: Colors.purple,
+                        minHeight: 2,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -313,8 +425,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
       ),
     );
   }
-
-  // ── Typing indicator ──────────────────────────────────────────────
 
   Widget _buildTypingIndicator() {
     return Padding(
@@ -325,12 +435,12 @@ class _AssistantScreenState extends State<AssistantScreen> {
             margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: NBColors.black,
+              color: NBColors.white,
               border: Border.all(color: NBColors.black, width: 2),
               borderRadius: NBRadius.softAll,
             ),
             child: const Icon(Icons.smart_toy_rounded,
-                color: NBColors.white, size: 16),
+                color: NBColors.black, size: 16),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -366,30 +476,61 @@ class _AssistantScreenState extends State<AssistantScreen> {
       ),
     );
   }
+}
 
-  // ── Quick chip ────────────────────────────────────────────────────
+class _ModeButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final bool isSpecial;
 
-  Widget _quickChip(String text) {
+  const _ModeButton({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+    this.isSpecial = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        _controller.text = text;
-        _sendMessage();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
-          color: NBColors.white,
+          color: isSelected 
+              ? (isSpecial ? Colors.purple : NBColors.black)
+              : NBColors.white,
           border: Border.all(color: NBColors.black, width: 2),
           borderRadius: NBRadius.softAll,
-          boxShadow: NBShadows.small,
+          boxShadow: isSelected ? NBShadows.pressed : NBShadows.small,
         ),
-        child: Text(text, style: NBText.bodySmall),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? NBColors.white : NBColors.black,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: NBText.label.copyWith(
+                fontSize: 10,
+                color: isSelected ? NBColors.white : NBColors.black,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Tactile send button
 class _SendButton extends StatefulWidget {
   final VoidCallback onSend;
   const _SendButton({required this.onSend});
