@@ -5,16 +5,24 @@ import '../../core/theme/neubrut_tokens.dart';
 import '../../core/widgets/nb_button.dart';
 import '../../core/widgets/nb_card.dart';
 
+class ReviewResult {
+  final List<ParsedClassSlot> slots;
+  final Map<String, dynamic>? fullJson;
+  ReviewResult({required this.slots, this.fullJson});
+}
+
 class TimetableImportReviewScreen extends StatefulWidget {
   final List<ParsedClassSlot> initialSlots;
   final List<ParseIssue> issues;
   final String rawText;
+  final Map<String, dynamic>? fullJson;
 
   const TimetableImportReviewScreen({
     super.key,
     required this.initialSlots,
     required this.issues,
     required this.rawText,
+    this.fullJson,
   });
 
   @override
@@ -124,7 +132,13 @@ class _TimetableImportReviewScreenState
               icon: Icons.check_rounded,
               onTap: _slots.isEmpty
                   ? null
-                  : () => Navigator.pop(context, _slots),
+                  : () => Navigator.pop(
+                        context,
+                        ReviewResult(
+                          slots: _slots,
+                          fullJson: widget.fullJson,
+                        ),
+                      ),
             ),
           ),
         ],

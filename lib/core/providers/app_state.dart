@@ -162,11 +162,68 @@ class AppState extends ChangeNotifier {
     return timetable.importTimetableFile(filePath: filePath, type: type);
   }
 
-  Future<void> applyImportedTimetable(List<ParsedClassSlot> slots) async {
+  Future<void> applyImportedTimetable(List<ParsedClassSlot> slots, {Map<String, dynamic>? fullJson}) async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+
+    if (user != null) {
+      try {
+        // 1. Save slots to timetable_entries
+        // First, clear existing entries if user wants a full replace, or just append
+        // For simplicity, let's append but in a real app we might ask.
+        final entriesToInsert = slots.map((s) => {
+          'user_id': user.id,
+          'day': s.day,
+          'subject': s.subject,
+          'start_time': _toDisplayTime(s.startTime24),
+          'room': s.room,
+          'duration_minutes': s.durationMinutes,
+        }).toList();
+
+        await client.from('timetable_entries').insert(entriesToInsert);
+
+        // 2. Save OCR audit if fullJson is present
+        if (fullJson != null) {
+          await timetable.saveOcrExtraction(fullJson);
+          
+          // 3. Process enriched subject data if present in 'subjects' list
+          if (fullJson.containsKey('subjects')) {
+            final subjectsData = fullJson['subjects'] as List<dynamic>;
+            for (final sub in subjectsData) {
+              if (sub is Map<String, dynamic>) {
+                final name = sub['name'] as String?;
+                if (name != null) {
+                  await attendance.addSubject(name);
+                  // Update with faculty/frequency if they exist
+                  await client.from('attendance').update({
+                    if (sub.containsKey('faculty')) 'faculty': sub['faculty'],
+                    if (sub.containsKey('weekly_frequency')) 'weekly_frequency': sub['weekly_frequency'],
+                  }).match({'user_id': user.id, 'subject': name});
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error applying and saving timetable: $e');
+      }
+    }
+
     timetable.applyImportedSchedule(slots);
     attendance.syncSubjects(timetable.subjects);
     await _refreshWidgetSnapshot();
     notifyListeners();
+  }
+
+  String _toDisplayTime(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return hhmm;
+    int h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    final ampm = h >= 12 ? 'PM' : 'AM';
+    if (h == 0) h = 12;
+    if (h > 12) h -= 12;
+    return '$h:${m.toString().padLeft(2, '0')} $ampm';
   }
 
   Future<void> addManualClass(String day, TimetableEntry entry) async {
