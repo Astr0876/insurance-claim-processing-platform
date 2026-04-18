@@ -78,17 +78,16 @@ class ExpenseChatBubble extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: NBSpacing.md),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              Wrap(
+                spacing: NBSpacing.sm,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   CategoryBadge(category: tx.category),
-                  if (tx.tags.isNotEmpty) ...[
-                     const SizedBox(width: NBSpacing.sm),
+                  if (tx.tags.isNotEmpty)
                      Text(
                        tx.tags.map((t) => '#$t').join(' '),
                        style: NBText.bodySmall.copyWith(fontWeight: FontWeight.bold),
                      )
-                  ]
                 ],
               )
             ],

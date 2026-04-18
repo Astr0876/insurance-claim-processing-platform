@@ -92,8 +92,10 @@ class _FocusScreenState extends State<FocusScreen> {
                         const SizedBox(height: NBSpacing.xl),
 
                         // Stat chips row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 12,
+                          runSpacing: 12,
                           children: [
                             StatChip(
                               icon: Icons.timer_rounded,

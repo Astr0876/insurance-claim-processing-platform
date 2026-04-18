@@ -8,6 +8,7 @@ import '../../features/attendance/attendance_screen.dart';
 import '../../features/focus/focus_screen.dart';
 import '../../features/assistant/assistant_screen.dart';
 import '../../features/study_hub/screens/rooms_screen.dart';
+import '../../features/expenses/screens/expense_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -47,6 +48,7 @@ class _AppShellState extends State<AppShell> {
           const FocusScreen(),
           const AssistantScreen(),
           const StudyHubRoomsScreen(),
+          const ExpenseScreen(),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),

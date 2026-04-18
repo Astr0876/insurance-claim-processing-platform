@@ -16,7 +16,7 @@ class ExpenseSummaryCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         NBCard(
-          fillColor: NBColors.yellow,
+          fillColor: NBColors.primary,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

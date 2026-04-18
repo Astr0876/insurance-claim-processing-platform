@@ -13,7 +13,7 @@ class CategoryBadge extends StatelessWidget {
       case 'Travel': return NBColors.blue;
       case 'Rent': return NBColors.pink;
       case 'Shopping': return NBColors.purple;
-      case 'Utilities': return NBColors.teal;
+      case 'Utilities': return NBColors.blue;
       case 'Entertainment': return NBColors.green;
       default: return NBColors.white;
     }
@@ -23,7 +23,7 @@ class CategoryBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return NBBadge(
       label: category.toUpperCase(),
-      color: _getCategoryColor(),
+      fillColor: _getCategoryColor(),
     );
   }
 }

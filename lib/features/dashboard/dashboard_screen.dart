@@ -270,7 +270,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           // Attendance
           Expanded(
             child: NBCard(
-              onTap: () => widget.onNavigate?.call(2),
+              onTap: () => widget.onNavigate?.call(3),
               shadows: NBShadows.medium,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,7 +312,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           // Focus
           Expanded(
             child: NBCard(
-              onTap: () => widget.onNavigate?.call(3),
+              onTap: () => widget.onNavigate?.call(4),
               shadows: NBShadows.medium,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,17 +389,24 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ),
                 const SizedBox(width: 8),
                 Text('UP NEXT', style: NBText.label.copyWith(letterSpacing: 2)),
-                const Spacer(),
-                NBBadge(
-                  label: 'Risk ${widgetData.riskLabel}',
-                  fillColor: riskColor,
-                  textColor: NBColors.black,
-                ),
-                const SizedBox(width: 6),
-                NBBadge(
-                  label: '$todayCount classes today',
-                  fillColor: NBColors.white,
-                  textColor: NBColors.black,
+                Expanded(
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      NBBadge(
+                        label: 'Risk ${widgetData.riskLabel}',
+                        fillColor: riskColor,
+                        textColor: NBColors.black,
+                      ),
+                      NBBadge(
+                        label: '$todayCount classes today',
+                        fillColor: NBColors.white,
+                        textColor: NBColors.black,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -459,9 +466,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildQuickActions() {
     final actions = [
       (Icons.calendar_month_rounded, 'Timetable', NBColors.blue, 1),
-      (Icons.fact_check_rounded, 'Attendance', NBColors.green, 2),
-      (Icons.psychology_rounded, 'Focus', NBColors.purple, 3),
-      (Icons.smart_toy_rounded, 'Ask AI', NBColors.pink, 4),
+      (Icons.view_kanban_rounded, 'Kanban', NBColors.warning, 2),
+      (Icons.fact_check_rounded, 'Attendance', NBColors.green, 3),
+      (Icons.psychology_rounded, 'Focus', NBColors.purple, 4),
+      (Icons.smart_toy_rounded, 'Ask AI', NBColors.pink, 5),
+      (Icons.groups_rounded, 'Hub', NBColors.orange, 6),
+      (Icons.payments_rounded, 'Spent', NBColors.primary, 7),
     ];
 
     return Padding(
@@ -475,7 +485,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             children: actions.map((a) {
               return Expanded(
                 child: Padding(
-                  padding: EdgeInsets.only(right: a.$4 < 4 ? 8 : 0),
+                  padding: EdgeInsets.only(right: a.$4 < 7 ? 8 : 0),
                   child: _actionButton(
                     icon: a.$1,
                     label: a.$2,
