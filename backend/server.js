@@ -27,10 +27,12 @@ const messages = {};   // roomId -> Message[]
 const files = {};      // roomId -> File[]
 const activity = {};   // roomId -> Activity[]
 const docs = {};       // roomId -> { content, version }
+const code = {};       // roomId -> { content, version }
 const polls = {};      // roomId -> Poll[]
 const sessions = {};   // roomId -> StudySession
 const presence = {};   // roomId -> { userId -> PresenceInfo }
 const pinnedItems = {}; // roomId -> PinnedItem[]
+const sketches = {};    // roomId -> SketchItem[]
 
 function getRoom(id) { return rooms[id]; }
 function ensureArrays(roomId) {
@@ -40,7 +42,9 @@ function ensureArrays(roomId) {
   if (!polls[roomId])       polls[roomId]       = [];
   if (!pinnedItems[roomId]) pinnedItems[roomId] = [];
   if (!docs[roomId])        docs[roomId]        = { content: '', version: 0 };
+  if (!code[roomId])        code[roomId]        = { content: '', version: 0 };
   if (!presence[roomId])    presence[roomId]    = {};
+  if (!sketches[roomId])    sketches[roomId]    = [];
 }
 
 function addActivity(roomId, userId, action, metadata = {}) {
@@ -101,6 +105,7 @@ app.get('/rooms/:roomId', (req, res) => {
     activity: activity[room.id] || [],
     polls: polls[room.id] || [],
     pinnedItems: pinnedItems[room.id] || [],
+    sketches: sketches[room.id] || [],
     doc: docs[room.id] || { content: '', version: 0 },
     studySession: sessions[room.id] || null,
     presence: presence[room.id] || {},
@@ -200,8 +205,10 @@ io.on('connection', (socket) => {
       messages: messages[roomId] || [],
       presence: Object.values(presence[roomId] || {}),
       doc: docs[roomId] || { content: '', version: 0 },
+      code: code[roomId] || { content: '', version: 0 },
       polls: polls[roomId] || [],
       pinnedItems: pinnedItems[roomId] || [],
+      sketches: sketches[roomId] || [],
       studySession: sessions[roomId] || null,
       activity: (activity[roomId] || []).slice(0, 30),
     });
@@ -215,6 +222,18 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('receive_message', msg);
     const act = addActivity(roomId, senderId, 'message_sent', { preview: content.slice(0, 40) });
     io.to(roomId).emit('activity_update', act);
+  });
+
+  /** sketch */
+  socket.on('sketch', ({ roomId, userId, data }) => {
+    ensureArrays(roomId);
+    if (data.action === 'clear') {
+      sketches[roomId] = [];
+    } else {
+      const item = { id: uuidv4(), userId, data, timestamp: new Date().toISOString() };
+      sketches[roomId].push(item);
+    }
+    socket.to(roomId).emit('sketch', { userId, data });
   });
 
   /** typing */
@@ -248,6 +267,17 @@ io.on('connection', (socket) => {
       docs[roomId] = { content, version, lastEditBy: userId, lastEditAt: new Date().toISOString() };
       socket.to(roomId).emit('doc_update', { content, version, lastEditBy: userId });
       const act = addActivity(roomId, userId, 'doc_edited', {});
+      socket.to(roomId).emit('activity_update', act);
+    }
+  });
+
+  /** code_update */
+  socket.on('code_update', ({ roomId, userId, content, version }) => {
+    ensureArrays(roomId);
+    if (version >= (code[roomId]?.version || 0)) {
+      code[roomId] = { content, version, lastEditBy: userId, lastEditAt: new Date().toISOString() };
+      socket.to(roomId).emit('code_update', { content, version, lastEditBy: userId });
+      const act = addActivity(roomId, userId, 'code_edited', {});
       socket.to(roomId).emit('activity_update', act);
     }
   });

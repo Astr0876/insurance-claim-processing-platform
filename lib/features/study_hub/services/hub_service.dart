@@ -38,9 +38,30 @@ class HubService extends ChangeNotifier {
   List<HubPoll>     polls        = [];
   List<PinnedItem>  pinnedItems  = [];
   List<ActivityItem> activities  = [];
+  List<Map<String, dynamic>> sketches = [];
   StudySession?     studySession;
   String            docContent   = '';
   int               docVersion   = 0;
+  String            codeContent  = '';
+  int               codeVersion  = 0;
+
+  // --- Study Squads Flow Trend ---
+  List<double> _flowTrend = [];
+  List<double> get flowTrend => List.unmodifiable(_flowTrend);
+
+  void updateFlowTrend(List<double> rawScores) {
+    // Anonymization logic: We only take the average or normalized values,
+    // losing individual identity in the squad chart.
+    if (rawScores.isEmpty) return;
+    
+    // Average score for the squad in this time bucket
+    final avg = rawScores.reduce((a, b) => a + b) / rawScores.length;
+    
+    _flowTrend.add(avg);
+    if (_flowTrend.length > 50) _flowTrend.removeAt(0);
+    
+    notifyListeners();
+  }
 
   Map<String, bool> typingUsers = {}; // userId -> isTyping
   bool _isLoading = false;
@@ -92,9 +113,14 @@ class HubService extends ChangeNotifier {
       polls       = _parsePolls(data['polls']);
       pinnedItems = _parsePins(data['pinnedItems']);
       activities  = _parseActivities(data['activity']);
+      sketches    = (data['sketches'] as List? ?? []).cast<Map<String, dynamic>>();
       if (data['doc'] != null) {
         docContent = data['doc']['content'] ?? '';
         docVersion = data['doc']['version'] ?? 0;
+      }
+      if (data['code'] != null) {
+        codeContent = data['code']['content'] ?? '';
+        codeVersion = data['code']['version'] ?? 0;
       }
       if (data['studySession'] != null) {
         studySession = StudySession.fromJson(data['studySession']);
@@ -133,6 +159,25 @@ class HubService extends ChangeNotifier {
         docVersion = incomingVersion;
         notifyListeners();
       }
+    });
+
+    _socket!.on('code_update', (data) {
+      final incomingVersion = data['version'] ?? 0;
+      if (incomingVersion >= codeVersion) {
+        codeContent = data['content'] ?? '';
+        codeVersion = incomingVersion;
+        notifyListeners();
+      }
+    });
+
+    _socket!.on('sketch', (data) {
+      final payload = Map<String, dynamic>.from(data);
+      if (payload['data']?['action'] == 'clear') {
+        sketches.clear();
+      } else {
+        sketches.add(payload);
+      }
+      notifyListeners();
     });
 
     _socket!.on('poll_update', (data) {
@@ -324,6 +369,39 @@ class HubService extends ChangeNotifier {
         'content': content,
         'version': docVersion,
       });
+    }
+    notifyListeners();
+  }
+
+  void updateCode(String content) {
+    codeContent = content;
+    codeVersion++;
+    if (currentRoom == null) return;
+    if (isConnected) {
+      _socket?.emit('code_update', {
+        'roomId': currentRoom!.id,
+        'userId': userId,
+        'content': content,
+        'version': codeVersion,
+      });
+    }
+    notifyListeners();
+  }
+
+  void sendSketch(Map<String, dynamic> data) {
+    if (currentRoom == null) return;
+    if (isConnected) {
+      _socket?.emit('sketch', {
+        'roomId': currentRoom!.id,
+        'userId': userId,
+        'data': data,
+      });
+    }
+    // Locally add it
+    if (data['action'] == 'clear') {
+      sketches.clear();
+    } else {
+      sketches.add({'userId': userId, 'data': data, 'timestamp': DateTime.now().toIso8601String()});
     }
     notifyListeners();
   }

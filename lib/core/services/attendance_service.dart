@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import '../utils/constants.dart';
 
 class AttendanceAnalytics {
@@ -38,9 +39,15 @@ class AttendanceRecord {
   /// How many classes can be bunked and stay at/above target
   int safeBunks({double target = 75.0}) {
     if (target <= 0 || target >= 100) return 0;
-    if (percentage < target) return 0;
-    final canBunk = (attended * 100 / target) - total;
-    return canBunk.floor().clamp(0, 999);
+    
+    // STRICT USER FORMULA: (Total Classes - (Total Classes * 0.75)) - Classes Already Missed
+    // This simplifies to: Attended - (target/100 * Total)
+    final double targetRatio = target / 100.0;
+    final int missed = total - attended;
+    final double allowedMisses = total * (1.0 - targetRatio);
+    final double bunkBudget = allowedMisses - missed;
+    
+    return bunkBudget.floor().clamp(0, 999);
   }
 
   String get statusMessage {
@@ -52,14 +59,14 @@ class AttendanceRecord {
     }
     if (pct >= 60) {
       final needed = classesToReachTarget();
-      return '🟠 Attend next $needed class${needed == 1 ? '' : 'es'} to recover!';
+      return '🟠 Classes to Recover: $needed. Attend next consecutive classes!';
     }
     final needed = classesToReachTarget();
-    return '🔴 Critical! Attend $needed classes immediately!';
+    return '🔴 Critical! Classes to Recover: $needed. Attend immediately!';
   }
 }
 
-class AttendanceService {
+class AttendanceService extends ChangeNotifier {
   Map<String, AttendanceRecord> _records = {};
 
   Map<String, AttendanceRecord> get records => _records;
@@ -93,8 +100,13 @@ class AttendanceService {
     );
     final totalClasses = _records.values.fold<int>(0, (s, r) => s + r.total);
     if (totalClasses == 0) return 0;
-    final canBunk = (totalAttended * 100 / 75) - totalClasses;
-    return canBunk.floor().clamp(0, 999);
+    
+    // STRICT USER FORMULA
+    final double allowedMisses = totalClasses * 0.25;
+    final int missed = totalClasses - totalAttended;
+    final double bunkBudget = allowedMisses - missed;
+    
+    return bunkBudget.floor().clamp(0, 999);
   }
 
   int get classesToRecover {

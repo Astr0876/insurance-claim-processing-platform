@@ -113,7 +113,7 @@ class AttendanceScreen extends StatelessWidget {
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
-                                            'Attend $classesToRecover more!',
+                                            'Classes to Recover: $classesToRecover',
                                             style: NBText.heading3,
                                           ),
                                         ),
@@ -247,7 +247,7 @@ class AttendanceScreen extends StatelessWidget {
                 child: Text(
                   pct >= 75
                       ? '✅ Safe — can bunk $safeBunks more'
-                      : '⚠️ Need $classesNeeded more classes',
+                      : '⚠️ Classes to Recover: $classesNeeded',
                   style: NBText.bodySmall.copyWith(
                     color: pct >= 75 ? NBColors.green : NBColors.warning,
                     fontWeight: FontWeight.w700,

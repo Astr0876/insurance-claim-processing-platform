@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 
 class FocusSession {
   final DateTime startTime;
@@ -29,9 +30,78 @@ class FocusSession {
   }
 }
 
-class FocusService {
+class AppContext {
+  final String appName;
+  final DateTime timestamp;
+  final bool isStudyApp;
+
+  AppContext({
+    required this.appName,
+    required this.timestamp,
+    required this.isStudyApp,
+  });
+}
+
+class FocusService extends ChangeNotifier {
   final List<FocusSession> _sessions = [];
   final Random _rand = Random(42);
+
+  // --- Context Switching & Cognitive Debt ---
+  final List<AppContext> _contextHistory = [];
+  double _cognitiveDebt = 0.0;
+  static const double debtThreshold = 50.0;
+  
+  final Set<String> studyApps = {'Notion', 'VS Code', 'Obsidian', 'Lumina', 'Coursera'};
+  final Set<String> distractionApps = {'Instagram', 'TikTok', 'Twitter', 'X', 'YouTube', 'Facebook'};
+
+  double get cognitiveDebt => _cognitiveDebt;
+
+  void recordAppSwitch(String appName) {
+    final now = DateTime.now();
+    final isStudy = studyApps.contains(appName);
+    final isDistraction = distractionApps.contains(appName);
+
+    // Exponential Decay: Debt decreases over time if no switches happen
+    if (_contextHistory.isNotEmpty) {
+      final lastSwitch = _contextHistory.last.timestamp;
+      final diffSeconds = now.difference(lastSwitch).inSeconds;
+      // Decay formula: Debt * e^(-k * t)
+      _cognitiveDebt *= exp(-0.01 * diffSeconds);
+    }
+
+    // Penalize rapid switches, especially to distraction apps
+    if (_contextHistory.isNotEmpty) {
+      final lastSwitch = _contextHistory.last.timestamp;
+      final interval = now.difference(lastSwitch).inSeconds;
+      
+      if (interval < 60) { // Rapid switch within a minute
+        if (isDistraction) {
+          _cognitiveDebt += 25.0 * (60 - interval) / 60;
+        } else {
+          _cognitiveDebt += 10.0 * (60 - interval) / 60;
+        }
+      }
+    }
+
+    _contextHistory.add(AppContext(
+      appName: appName,
+      timestamp: now,
+      isStudyApp: isStudy,
+    ));
+
+    if (_cognitiveDebt > debtThreshold) {
+      _triggerFocusAlert();
+    }
+    
+    notifyListeners();
+  }
+
+  void _triggerFocusAlert() {
+    // This will be listened to by AppState or AssistantService
+    debugPrint('LUMINA ALERT: Focus Interruption! Cognitive Debt: ${_cognitiveDebt.toStringAsFixed(1)}');
+  }
+
+  // --- Legacy Focus Logic ---
 
   List<FocusSession> get sessions => List.unmodifiable(_sessions);
 

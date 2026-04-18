@@ -87,29 +87,41 @@ class _ChatTabState extends State<ChatTab> {
         if (svc.pinnedItems.isNotEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
               color: NBColors.primary,
               border: Border(bottom: BorderSide(color: NBColors.black, width: 2)),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text('📌', style: TextStyle(fontSize: 14)),
-                    const SizedBox(width: 6),
-                    Text('PINNED', style: NBText.label.copyWith(letterSpacing: 2, fontSize: 10)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  svc.pinnedItems.first.content,
-                  style: NBText.bodySmall.copyWith(fontWeight: FontWeight.w700),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Text('📌', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 8),
+                  ...svc.pinnedItems.take(3).map((pin) => Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: NBColors.white,
+                      border: Border.all(color: NBColors.black, width: 2),
+                      borderRadius: NBRadius.softAll,
+                      boxShadow: NBShadows.small,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(pin.label.toUpperCase(), style: NBText.label.copyWith(fontSize: 8)),
+                        Text(
+                          pin.content,
+                          style: NBText.bodySmall.copyWith(fontWeight: FontWeight.w700, fontSize: 10),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  )),
+                ],
+              ),
             ),
           ),
 
@@ -120,7 +132,11 @@ class _ChatTabState extends State<ChatTab> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             itemCount: svc.messages.length + (svc.typingUsers.isNotEmpty ? 1 : 0),
             itemBuilder: (context, i) {
-              if (i == svc.messages.length) return _TypingIndicator(names: svc.typingUsers.keys.toList());
+              if (i == svc.messages.length) {
+                final uids = svc.typingUsers.keys.toList();
+                final names = uids.map((id) => svc.presence.firstWhere((p) => p.userId == id, orElse: () => PresenceInfo(userId: id, userName: 'Someone', status: '', lastSeen: '')).userName).toList();
+                return _TypingIndicator(names: names);
+              }
               return _MessageCard(
                 msg: svc.messages[i],
                 myId: svc.userId,
@@ -291,6 +307,14 @@ class _TypingIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (names.isEmpty) return const SizedBox.shrink();
+    
+    final text = names.length == 1 
+      ? '${names[0]} is typing' 
+      : names.length == 2 
+        ? '${names[0]} and ${names[1]} are typing' 
+        : '${names[0]} and ${names.length - 1} others are typing';
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -307,24 +331,49 @@ class _TypingIndicator extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${names.first} is typing',
+                  text,
                   style: NBText.bodySmall.copyWith(color: const Color(0xFF666666), fontStyle: FontStyle.italic),
                 ),
                 const SizedBox(width: 8),
-                ...List.generate(3, (i) => Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: i % 2 == 0 ? NBColors.black : NBColors.primary,
-                    border: Border.all(color: NBColors.black, width: 1),
-                    borderRadius: NBRadius.softAll,
-                  ),
-                )),
+                ...List.generate(3, (i) => _Dot(index: i)),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _Dot extends StatefulWidget {
+  final int index;
+  const _Dot({required this.index});
+  @override
+  State<_Dot> createState() => _DotState();
+}
+
+class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
+  late AnimationController _anim;
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 600))..repeat(reverse: true);
+  }
+  @override
+  void dispose() { _anim.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, _) => Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        width: 6,
+        height: 6,
+        decoration: BoxDecoration(
+          color: (_anim.value > (widget.index / 3)) ? NBColors.primary : NBColors.black,
+          border: Border.all(color: NBColors.black, width: 1),
+          borderRadius: NBRadius.softAll,
+        ),
       ),
     );
   }

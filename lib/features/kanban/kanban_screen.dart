@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:kanban_board/kanban_board.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/services/kanban_service.dart';
 import '../../core/theme/neubrut_tokens.dart';
-import '../../core/theme/app_theme.dart';
 import '../../core/widgets/nb_card.dart';
 import '../../core/widgets/nb_button.dart';
 
@@ -49,113 +49,144 @@ class _KanbanScreenState extends State<KanbanScreen> {
       return groups.firstWhere((g) => g.id == idStr, orElse: () => groups[0]);
     }
 
-    return Scaffold(
-      backgroundColor: NBColors.bg,
-      appBar: AppBar(
-        backgroundColor: NBColors.bg,
-        elevation: 0,
-        centerTitle: false,
-        title: Text(
-          'PROGRESS ENGINE',
-          style: NBText.heading2.copyWith(letterSpacing: 2),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_box_rounded, color: NBColors.black, size: 28),
-            onPressed: () => _showAddTaskDialog(context, kanban),
-          ),
-          const SizedBox(width: NBSpacing.sm),
-        ],
-      ),
-      body: KanbanBoard(
-        controller: _controller,
-        groups: groups,
-        onGroupItemMove: (oldGroupId, oldItemIndex, newGroupId, newItemIndex) {
-          final String taskId;
-          final KanbanStatus newStatus;
-
-          final oldGroup = findGroup(oldGroupId);
-          taskId = oldGroup.items[oldItemIndex!].taskId;
-
-          if (newGroupId is int) {
-            newStatus = _statusFromGroupIndex(newGroupId);
-          } else {
-            newStatus = _statusFromGroupId(newGroupId.toString());
-          }
-
-          kanban.updateTaskStatus(taskId, newStatus);
-        },
-        groupHeaderBuilder: (context, groupId) {
-          final group = findGroup(groupId);
-          
-          return Padding(
-            padding: const EdgeInsets.all(NBSpacing.md),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: _colorForStatus(group.id),
-                border: Border.all(color: NBColors.black, width: 2),
-                borderRadius: NBRadius.softAll,
-                boxShadow: NBShadows.small,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    group.name.toUpperCase(),
-                    style: NBText.label.copyWith(fontSize: 12),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: NBColors.white,
-                      border: Border.all(color: NBColors.black, width: 1.5),
-                      borderRadius: NBRadius.softAll,
-                    ),
-                    child: Text(
-                      group.items.length.toString(),
-                      style: NBText.monoSmall.copyWith(fontSize: 10),
-                    ),
-                  ),
-                ],
-              ),
+    return Column(
+      children: [
+        // ── Info Bar ────────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: const BoxDecoration(
+            color: NBColors.white,
+            border: Border(
+              bottom: BorderSide(color: NBColors.black, width: 2),
             ),
-          );
-        },
-        groupItemBuilder: (context, groupId, itemIndex) {
-          final group = findGroup(groupId);
-          final task = group.items[itemIndex!];
-          
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: NBSpacing.md, vertical: NBSpacing.xs),
-            child: NBCard(
-              padding: const EdgeInsets.all(NBSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.view_kanban_outlined, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                'TEAM PROGRESS ENGINE',
+                style: NBText.label.copyWith(fontSize: 10),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => _showAddTaskDialog(context, kanban),
+                child: Row(
+                  children: [
+                    const Icon(Icons.add_box_rounded, size: 18),
+                    const SizedBox(width: 4),
+                    Text('ADD TASK', style: NBText.label.copyWith(fontSize: 10)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: KanbanBoard(
+            controller: _controller,
+            groups: groups,
+            onGroupItemMove: (oldGroupId, oldItemIndex, newGroupId, newItemIndex) {
+              final String taskId;
+              final KanbanStatus newStatus;
+
+              final oldGroup = findGroup(oldGroupId);
+              taskId = oldGroup.items[oldItemIndex!].taskId;
+
+              if (newGroupId is int) {
+                newStatus = _statusFromGroupIndex(newGroupId);
+              } else {
+                newStatus = _statusFromGroupId(newGroupId.toString());
+              }
+
+              // Trigger Haptics
+              HapticFeedback.mediumImpact();
+
+              // Celebration Vibe
+              if (newStatus == KanbanStatus.done) {
+                HapticFeedback.heavyImpact();
+                _showCompletionCelebration(context, taskId);
+              }
+
+              kanban.updateTaskStatus(taskId, newStatus);
+            },
+            groupHeaderBuilder: (context, groupId) {
+              final group = findGroup(groupId);
+              
+              return Padding(
+                padding: const EdgeInsets.all(NBSpacing.md),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _colorForStatus(group.id),
+                    border: Border.all(color: NBColors.black, width: 2),
+                    borderRadius: NBRadius.softAll,
+                    boxShadow: NBShadows.small,
+                  ),
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
                         child: Text(
-                          task.title,
-                          style: NBText.heading3.copyWith(fontSize: 16),
+                          group.name.toUpperCase(),
+                          style: NBText.label.copyWith(fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      _buildAssigneeBadge(task.assigneeAvatar, task.assignee),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: NBColors.white,
+                          border: Border.all(color: NBColors.black, width: 1.5),
+                          borderRadius: NBRadius.softAll,
+                        ),
+                        child: Text(
+                          group.items.length.toString(),
+                          style: NBText.monoSmall.copyWith(fontSize: 10),
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: NBSpacing.xs),
-                  Text(
-                    task.description,
-                    style: NBText.bodySmall.copyWith(color: Colors.black54),
+                ),
+              );
+            },
+            groupItemBuilder: (context, groupId, itemIndex) {
+              final group = findGroup(groupId);
+              final task = group.items[itemIndex!];
+              
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: NBSpacing.md, vertical: NBSpacing.xs),
+                child: NBCard(
+                  padding: const EdgeInsets.all(NBSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              style: NBText.heading3.copyWith(fontSize: 16),
+                            ),
+                          ),
+                          _buildAssigneeBadge(task.assigneeAvatar, task.assignee),
+                        ],
+                      ),
+                      const SizedBox(height: NBSpacing.xs),
+                      Text(
+                        task.description,
+                        style: NBText.bodySmall.copyWith(color: Colors.black54),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -265,6 +296,31 @@ class _KanbanScreenState extends State<KanbanScreen> {
           border: InputBorder.none,
           hintStyle: NBText.bodySmall,
         ),
+      ),
+    );
+  }
+
+  void _showCompletionCelebration(BuildContext context, String taskId) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: NBColors.green,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(NBSpacing.md),
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(color: NBColors.black, width: 2),
+          borderRadius: NBRadius.softAll,
+        ),
+        content: Row(
+          children: [
+            const Icon(Icons.celebration, color: NBColors.black),
+            const SizedBox(width: 12),
+            Text(
+              'TASK COMPLETED! 🚀',
+              style: NBText.label.copyWith(color: NBColors.black),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

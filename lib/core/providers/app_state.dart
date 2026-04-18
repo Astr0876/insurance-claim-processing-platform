@@ -5,6 +5,9 @@ import '../services/timetable_service.dart';
 import '../services/assistant_service.dart';
 import '../services/kanban_service.dart';
 import '../services/latex_service.dart';
+import '../services/calendar_service.dart';
+import '../../features/expenses/controllers/expense_controller.dart';
+import '../services/home_widget_service.dart';
 
 class HomeWidgetSnapshot {
   final String nextClassLabel;
@@ -27,9 +30,19 @@ class AppState extends ChangeNotifier {
   final AssistantService assistant = AssistantService();
   final KanbanService kanban = KanbanService();
   final LaTeXService latex = LaTeXService();
+  final ExpenseController expenses = ExpenseController();
+  final CalendarService calendar = CalendarService();
+
+  AppState() {
+    assistant.addListener(notifyListeners);
+    expenses.addListener(notifyListeners);
+    latex.addListener(notifyListeners);
+    calendar.addListener(notifyListeners);
+  }
 
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
+
   HomeWidgetSnapshot _widgetSnapshot = const HomeWidgetSnapshot(
     nextClassLabel: 'No class',
     nextClassTime: '--',
@@ -38,41 +51,57 @@ class AppState extends ChangeNotifier {
   );
   HomeWidgetSnapshot get widgetSnapshot => _widgetSnapshot;
 
-  // Student name for personalization
   String _studentName = 'Student';
   String get studentName => _studentName;
+
+  double _batteryLevel = 100;
+  double get batteryLevel => _batteryLevel;
+  bool _showBatteryAlert = false;
+  bool get showBatteryAlert => _showBatteryAlert;
 
   void setStudentName(String name) {
     _studentName = name;
     notifyListeners();
   }
 
+  void simulateBatteryDrop(double level) {
+    _batteryLevel = level;
+    if (_batteryLevel <= 15) {
+      _showBatteryAlert = true;
+    }
+    notifyListeners();
+  }
+
+  void dismissBatteryAlert() {
+    _showBatteryAlert = false;
+    notifyListeners();
+  }
+
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    // Load demo data for all services
     timetable.loadDemoData();
     attendance.loadDemoData();
     focus.loadDemoData();
     assistant.loadDemoDocument();
-    _refreshWidgetSnapshot();
+    await _refreshWidgetSnapshot();
     kanban.loadDemoData();
     latex.loadDemoData();
+    calendar.loadDemoData();
 
     _isInitialized = true;
     notifyListeners();
   }
 
-  // Attendance actions
-  void markAttended(String subject) {
+  Future<void> markAttended(String subject) async {
     attendance.markAttended(subject);
-    _refreshWidgetSnapshot();
+    await _refreshWidgetSnapshot();
     notifyListeners();
   }
 
-  void markAbsent(String subject) {
+  Future<void> markAbsent(String subject) async {
     attendance.markAbsent(subject);
-    _refreshWidgetSnapshot();
+    await _refreshWidgetSnapshot();
     notifyListeners();
   }
 
@@ -83,54 +112,37 @@ class AppState extends ChangeNotifier {
     return timetable.importTimetableFile(filePath: filePath, type: type);
   }
 
-  void applyImportedTimetable(List<ParsedClassSlot> slots) {
+  Future<void> applyImportedTimetable(List<ParsedClassSlot> slots) async {
     timetable.applyImportedSchedule(slots);
     attendance.syncSubjects(timetable.subjects);
-    _refreshWidgetSnapshot();
+    await _refreshWidgetSnapshot();
     notifyListeners();
   }
 
-  void addManualClass(String day, TimetableEntry entry) {
+  Future<void> addManualClass(String day, TimetableEntry entry) async {
     timetable.addManualEntry(day, entry);
     attendance.addSubject(entry.subject);
-    _refreshWidgetSnapshot();
+    await _refreshWidgetSnapshot();
     notifyListeners();
   }
 
-  // Stress level (0-100)
   double get stressLevel {
-    double stress = 50; // base
-
-    // High attendance reduces stress
-    final att = attendance.overallPercentage;
-    if (att >= 85) {
-      stress -= 20;
-    } else if (att >= 75) {
-      stress -= 10;
-    } else if (att < 60) {
-      stress += 25;
-    } else if (att < 75) {
-      stress += 15;
-    }
-
-    // Good focus reduces stress
+    final attendanceRisk = (100 - attendance.overallPercentage).clamp(0.0, 100.0);
+    final deadlineProximity = calendar.deadlineProximityScore;
+    final cognitiveDebt = (kanban.todoTasks.length * 12.0).clamp(0.0, 100.0);
+    double stress = (0.4 * attendanceRisk) + (0.4 * deadlineProximity) + (0.2 * cognitiveDebt);
     final focusScore = focus.todayFocusScore;
     if (focusScore >= 80) {
-      stress -= 15;
-    } else if (focusScore >= 60) {
-      stress -= 5;
+      stress -= 10;
     } else if (focusScore < 40) {
-      stress += 15;
+      stress += 10;
     }
-
-    // Many classes today adds stress
-    final classCount = timetable.totalClassesToday;
-    stress += (classCount * 3).toDouble();
-
     return stress.clamp(0, 100);
   }
 
   Color get stressColor {
+    final state = calendar.stressState;
+    if (state == StressState.red) return const Color(0xFFFF6B6B);
     final s = stressLevel;
     if (s < 30) return const Color(0xFF00E676);
     if (s < 50) return const Color(0xFF76FF03);
@@ -140,6 +152,8 @@ class AppState extends ChangeNotifier {
   }
 
   String get stressLabel {
+    final state = calendar.stressState;
+    if (state == StressState.red) return 'Red Alert! 🚨';
     final s = stressLevel;
     if (s < 30) return 'Zen Mode 🧘';
     if (s < 50) return 'Doing Good 😊';
@@ -148,12 +162,12 @@ class AppState extends ChangeNotifier {
     return 'Overload! 🔥';
   }
 
-  void refresh() {
-    _refreshWidgetSnapshot();
+  Future<void> refresh() async {
+    await _refreshWidgetSnapshot();
     notifyListeners();
   }
 
-  void _refreshWidgetSnapshot() {
+  Future<void> _refreshWidgetSnapshot() async {
     final nextClass = timetable.getNextClass();
     final attendancePct = attendance.overallPercentage;
     final risk = attendancePct < 60
@@ -162,11 +176,14 @@ class AppState extends ChangeNotifier {
         ? 'MEDIUM'
         : 'LOW';
 
-    _widgetSnapshot = HomeWidgetSnapshot(
+    final newSnapshot = HomeWidgetSnapshot(
       nextClassLabel: nextClass?.subject ?? 'No class',
       nextClassTime: nextClass?.time ?? '--',
       attendancePercentage: attendancePct,
       riskLabel: risk,
     );
+
+    _widgetSnapshot = newSnapshot;
+    await HomeWidgetService.updateWidget(newSnapshot);
   }
 }

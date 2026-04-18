@@ -18,7 +18,7 @@ class ParserService {
       type = TransactionType.split;
       
       // Extract people count: e.g., "with 4 friends", "split 800 by 4"
-      RegExp peopleRegex = RegExp(r'(?:with |among |by )?(\d+)(?: friends| people| guys)?');
+      RegExp peopleRegex = RegExp(r'(?:with|among|by|between)\s+(\d+)(?:\s+(?:friends|people|guys))?', caseSensitive: false);
       var peopleMatch = peopleRegex.firstMatch(lower);
       if (peopleMatch != null && peopleMatch.group(1) != null) {
         peopleCount = int.tryParse(peopleMatch.group(1)!) ?? 1;
@@ -32,10 +32,24 @@ class ParserService {
     }
 
     // 2. Extract Amount
-    RegExp amountRegex = RegExp(r'(?:rs|inr|₹)?\s?(\d+(?:\.\d{1,2})?)');
+    // Improved regex to handle numbers more reliably
+    RegExp amountRegex = RegExp(r'(?:rs|inr|₹|bucks|buck)?\s?(\d+(?:\.\d{1,2})?)', caseSensitive: false);
     var amountMatch = amountRegex.firstMatch(lower);
     if (amountMatch != null && amountMatch.group(1) != null) {
       amount = double.tryParse(amountMatch.group(1)!) ?? 0;
+    }
+
+    // 2.1 Fallback for plain numbers if no currency symbol found
+    if (amount == 0) {
+      RegExp fallbackRegex = RegExp(r'\b(\d+(?:\.\d{1,2})?)\b');
+      var matches = fallbackRegex.allMatches(lower);
+      for (var m in matches) {
+        double? val = double.tryParse(m.group(1)!);
+        if (val != null && val > 0) {
+          amount = val;
+          break;
+        }
+      }
     }
 
     // 3. Extract Tags

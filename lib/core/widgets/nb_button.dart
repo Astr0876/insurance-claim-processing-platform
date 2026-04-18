@@ -5,6 +5,7 @@ import '../theme/neubrut_tokens.dart';
 class NBButton extends StatefulWidget {
   final String label;
   final VoidCallback? onTap;
+  final VoidCallback? onPressed;
   final Color fillColor;
   final Color labelColor;
   final IconData? icon;
@@ -16,6 +17,7 @@ class NBButton extends StatefulWidget {
     super.key,
     required this.label,
     this.onTap,
+    this.onPressed,
     this.fillColor = NBColors.primary,
     this.labelColor = NBColors.black,
     this.icon,
@@ -29,6 +31,7 @@ class NBButton extends StatefulWidget {
     super.key,
     required this.label,
     this.onTap,
+    this.onPressed,
     this.icon,
     this.fullWidth = false,
     this.padding = const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -45,6 +48,8 @@ class _NBButtonState extends State<NBButton> {
 
   @override
   Widget build(BuildContext context) {
+    final callback = widget.onTap ?? widget.onPressed;
+    
     Widget content = Row(
       mainAxisSize: widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -65,10 +70,10 @@ class _NBButtonState extends State<NBButton> {
     );
 
     return GestureDetector(
-      onTapDown:   widget.onTap != null ? (_) => setState(() => _pressed = true)  : null,
-      onTapUp:     widget.onTap != null ? (_) => setState(() => _pressed = false) : null,
-      onTapCancel: widget.onTap != null ? ()  => setState(() => _pressed = false) : null,
-      onTap:       widget.onTap,
+      onTapDown:   callback != null ? (_) => setState(() => _pressed = true)  : null,
+      onTapUp:     callback != null ? (_) => setState(() => _pressed = false) : null,
+      onTapCancel: callback != null ? ()  => setState(() => _pressed = false) : null,
+      onTap:       callback,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 80),
         transform: _pressed

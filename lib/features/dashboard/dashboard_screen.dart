@@ -131,12 +131,54 @@ class _DashboardScreenState extends State<DashboardScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            TimeHelper.greeting().toUpperCase(),
-            style: NBText.label.copyWith(
-              color: const Color(0xFF777777),
-              letterSpacing: 2,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    TimeHelper.greeting().toUpperCase(),
+                    style: NBText.label.copyWith(
+                      color: const Color(0xFF777777),
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ],
+              ),
+              // Battery Indicator
+              GestureDetector(
+                onTap: () => state.simulateBatteryDrop(14.0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: state.batteryLevel <= 15 ? NBColors.danger : NBColors.white,
+                    border: Border.all(color: NBColors.black, width: 2),
+                    borderRadius: NBRadius.softAll,
+                    boxShadow: NBShadows.small,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        state.batteryLevel <= 15 
+                            ? Icons.battery_alert_rounded 
+                            : Icons.battery_charging_full_rounded,
+                        size: 16,
+                        color: state.batteryLevel <= 15 ? NBColors.white : NBColors.black,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${state.batteryLevel.round()}%',
+                        style: NBText.monoSmall.copyWith(
+                          fontSize: 10,
+                          color: state.batteryLevel <= 15 ? NBColors.white : NBColors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Container(
@@ -155,6 +197,71 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ),
           ),
+          // Battery Guardian Alert
+          if (state.showBatteryAlert) 
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: NBCard(
+                fillColor: NBColors.danger,
+                shadows: NBShadows.large,
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.bolt_rounded, color: NBColors.white, size: 24),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'BATTERY GUARDIAN ACTIVE!',
+                                style: NBText.heading3.copyWith(color: NBColors.white),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Renee, your battery dropped to 14%. Power-saving is active.',
+                                style: NBText.bodySmall.copyWith(color: NBColors.white),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(color: NBColors.white, thickness: 1),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.check_circle_outline, color: NBColors.white, size: 14),
+                        const SizedBox(width: 6),
+                        Text('RAG indexing paused.', style: NBText.label.copyWith(color: NBColors.white, fontSize: 8)),
+                        const Spacer(),
+                        const Icon(Icons.check_circle_outline, color: NBColors.white, size: 14),
+                        const SizedBox(width: 6),
+                        Text('Final Sync complete.', style: NBText.label.copyWith(color: NBColors.white, fontSize: 8)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () => state.dismissBatteryAlert(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: NBColors.white,
+                          border: Border.all(color: NBColors.black, width: 2),
+                          borderRadius: NBRadius.softAll,
+                        ),
+                        child: Center(
+                          child: Text('GOT IT, SAVING POWER!', style: NBText.label),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -164,79 +271,182 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildStressCard(AppState state) {
     final stressColor = state.stressColor;
+    final calendar = state.calendar;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: NBCard(
         fillColor: NBColors.white,
         shadows: NBShadows.medium,
-        child: Row(
+        child: Column(
           children: [
-            // Ring
-            AnimatedPercentageRing(
-              percentage: state.stressLevel,
-              size: 72,
-              color: stressColor,
-              strokeWidth: 7,
-              child: Text(
-                '${state.stressLevel.round()}',
-                style: NBText.monoSmall.copyWith(color: stressColor),
-              ),
-            ),
-            const SizedBox(width: NBSpacing.lg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'STRESS LEVEL',
-                    style: NBText.label.copyWith(
-                      color: const Color(0xFF777777),
-                      fontSize: 9,
-                    ),
+            Row(
+              children: [
+                // Ring
+                AnimatedPercentageRing(
+                  percentage: state.stressLevel,
+                  size: 72,
+                  color: stressColor,
+                  strokeWidth: 7,
+                  child: Text(
+                    '${state.stressLevel.round()}',
+                    style: NBText.monoSmall.copyWith(color: stressColor),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
+                ),
+                const SizedBox(width: NBSpacing.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        state.stressLabel,
-                        style: NBText.heading3.copyWith(color: stressColor),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'STRESS LEVEL',
+                                style: NBText.label.copyWith(
+                                  color: const Color(0xFF777777),
+                                  fontSize: 9,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              GestureDetector(
+                                onTap: () => _showStressBreakdown(context, state),
+                                child: const Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 10,
+                                  color: Color(0xFF777777),
+                                ),
+                              ),
+                            ],
+                          ),
+                          GestureDetector(
+                            onTap: () => calendar.syncGmail(),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: calendar.isSyncing ? NBColors.black : NBColors.white,
+                                border: Border.all(color: NBColors.black, width: 1),
+                                borderRadius: NBRadius.softAll,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    calendar.isSyncing ? Icons.sync : Icons.mail_outline_rounded,
+                                    size: 10,
+                                    color: calendar.isSyncing ? NBColors.white : NBColors.black,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    calendar.isSyncing ? 'SYNCING...' : 'GMAIL SYNC',
+                                    style: NBText.label.copyWith(
+                                      fontSize: 7,
+                                      color: calendar.isSyncing ? NBColors.white : NBColors.black,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      NBBadge(
-                        label: '${state.stressLevel.round()}',
-                        fillColor: stressColor,
-                        textColor: NBColors.white,
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            state.stressLabel,
+                            style: NBText.heading3.copyWith(color: stressColor),
+                          ),
+                          const SizedBox(width: 8),
+                          NBBadge(
+                            label: '${state.stressLevel.round()}',
+                            fillColor: stressColor,
+                            textColor: NBColors.white,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Hard progress bar
+                      ClipRRect(
+                        borderRadius: NBRadius.softAll,
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: state.stressLevel / 100),
+                          duration: const Duration(milliseconds: 1200),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, value, _) {
+                            return Stack(
+                              children: [
+                                Container(
+                                  height: 8,
+                                  color: stressColor.withValues(alpha: 0.15),
+                                ),
+                                FractionallySizedBox(
+                                  widthFactor: value,
+                                  child: Container(height: 8, color: stressColor),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  // Hard progress bar
-                  ClipRRect(
-                    borderRadius: NBRadius.softAll,
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0, end: state.stressLevel / 100),
-                      duration: const Duration(milliseconds: 1200),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, value, _) {
-                        return Stack(
-                          children: [
-                            Container(
-                              height: 8,
-                              color: stressColor.withValues(alpha: 0.15),
-                            ),
-                            FractionallySizedBox(
-                              widthFactor: value,
-                              child: Container(height: 8, color: stressColor),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
+                ),
+              ],
+            ),
+            if (calendar.deadlines.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Divider(color: NBColors.black, thickness: 1),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, size: 14, color: NBColors.black),
+                  const SizedBox(width: 6),
+                  Text(
+                    'UPCOMING DEADLINES:',
+                    style: NBText.label.copyWith(fontSize: 8, letterSpacing: 1),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 32,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: calendar.deadlines.take(3).length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final d = calendar.deadlines[index];
+                    final isClose = d.date.difference(DateTime.now()).inDays <= 1;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isClose ? const Color(0xFFFFEAEA) : NBColors.white,
+                        border: Border.all(color: NBColors.black, width: 1),
+                        borderRadius: NBRadius.softAll,
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            d.title.toUpperCase(),
+                            style: NBText.label.copyWith(
+                              fontSize: 7,
+                              color: isClose ? NBColors.danger : NBColors.black,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            DateFormat('dd MMM').format(d.date),
+                            style: NBText.monoSmall.copyWith(fontSize: 7),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -448,16 +658,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: NBCard(
-        onTap: () {
-          Navigator.push(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, _) => const LaTeXPreviewScreen(),
-              transitionsBuilder: (context, animation, _, child) =>
-                  FadeTransition(opacity: animation, child: child),
-            ),
-          );
-        },
+        onTap: () => widget.onNavigate?.call(7),
         fillColor: NBColors.white,
         shadows: NBShadows.medium,
         child: Column(
@@ -542,7 +743,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       (Icons.psychology_rounded, 'Focus', NBColors.purple, 4),
       (Icons.smart_toy_rounded, 'Ask AI', NBColors.pink, 5),
       (Icons.groups_rounded, 'Hub', NBColors.orange, 6),
-      (Icons.payments_rounded, 'Spent', NBColors.primary, 7),
+      (Icons.payments_rounded, 'Spent', NBColors.primary, 8),
     ];
 
     return Padding(
@@ -662,7 +863,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
-                        'consecutive classes needed\nto reach 75% attendance',
+                        'CLASSES TO RECOVER\nconsecutive classes needed to reach 75%',
                         style: NBText.bodySmall.copyWith(color: NBColors.white),
                       ),
                     ),
@@ -673,6 +874,76 @@ class _DashboardScreenState extends State<DashboardScreen>
           ],
         ),
       ),
+    );
+  }
+
+  void _showStressBreakdown(BuildContext context, AppState state) {
+    final attRisk = (100 - state.attendance.overallPercentage).clamp(0.0, 100.0);
+    final deadlineProx = state.calendar.deadlineProximityScore;
+    final cognitiveDebt = (state.kanban.todoTasks.length * 12.0).clamp(0.0, 100.0);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: NBColors.bg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+        side: BorderSide(color: NBColors.black, width: 2),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('STRESS BREAKDOWN', style: NBText.heading3),
+            const SizedBox(height: 16),
+            _breakdownItem('Attendance Risk (40%)', attRisk, NBColors.danger),
+            const SizedBox(height: 12),
+            _breakdownItem('Deadline Proximity (40%)', deadlineProx, NBColors.orange),
+            const SizedBox(height: 12),
+            _breakdownItem('Cognitive Debt (20%)', cognitiveDebt, NBColors.purple),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(12),
+              color: NBColors.white,
+              child: Text(
+                'Note: Good focus during study sessions can reduce overall stress by up to 10 points.',
+                style: NBText.bodySmall.copyWith(fontStyle: FontStyle.italic),
+              ),
+            ),
+            const SizedBox(height: 24),
+            NBButton(
+              label: 'GOT IT',
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _breakdownItem(String label, double value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: NBText.label.copyWith(fontSize: 10)),
+            Text('${value.round()}', style: NBText.monoSmall),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Stack(
+          children: [
+            Container(height: 12, color: NBColors.black.withValues(alpha: 0.1)),
+            FractionallySizedBox(
+              widthFactor: value / 100,
+              child: Container(height: 12, color: color),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

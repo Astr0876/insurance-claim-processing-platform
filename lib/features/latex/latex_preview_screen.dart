@@ -15,6 +15,24 @@ class LaTeXPreviewScreen extends StatefulWidget {
 
 class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
   final GlobalKey<SfPdfViewerState> _pdfViewerKey = GlobalKey();
+  final TextEditingController _editorController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final latex = Provider.of<AppState>(context, listen: false).latex;
+      if (latex.currentReport != null) {
+        _editorController.text = latex.currentReport!.rawContent;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _editorController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,9 +40,101 @@ class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
     final latex = appState.latex;
     final report = latex.currentReport;
 
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          // ── Tab Bar ───────────────────────────────────────────────
+          Container(
+            color: NBColors.white,
+            child: TabBar(
+              labelColor: NBColors.black,
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: NBColors.primary,
+              indicatorWeight: 4,
+              labelStyle: NBText.label.copyWith(fontSize: 12),
+              tabs: const [
+                Tab(text: 'EDITOR'),
+                Tab(text: 'PREVIEW'),
+              ],
+            ),
+          ),
+          
+          Expanded(
+            child: TabBarView(
+              children: [
+                // ── Editor Tab ──────────────────────────────────────
+                _buildEditor(latex),
+                
+                // ── Preview Tab ─────────────────────────────────────
+                _buildPreview(latex, report),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditor(latex) {
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: NBColors.white,
+              border: Border.all(color: NBColors.black, width: 2),
+              borderRadius: NBRadius.softAll,
+            ),
+            child: TextField(
+              controller: _editorController,
+              maxLines: null,
+              expands: true,
+              style: NBText.monoSmall.copyWith(fontSize: 13, height: 1.5),
+              decoration: const InputDecoration(
+                contentPadding: EdgeInsets.all(16),
+                border: InputBorder.none,
+                hintText: 'Type your LaTeX here...',
+              ),
+              onChanged: (val) => latex.updateContent(val),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 24,
+          right: 24,
+          child: FloatingActionButton.extended(
+            onPressed: () => _showAiAssistDialog(latex),
+            backgroundColor: NBColors.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: NBRadius.softAll,
+              side: const BorderSide(color: NBColors.black, width: 2),
+            ),
+            label: Row(
+              children: [
+                if (latex.isGenerating)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: NBColors.black),
+                  )
+                else
+                  const Icon(Icons.auto_awesome_rounded, color: NBColors.black, size: 20),
+                const SizedBox(width: 8),
+                Text('AI ASSIST', style: NBText.label.copyWith(fontSize: 12)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreview(latex, report) {
     return Column(
       children: [
-        // ── Info Bar ────────────────────────────────────────────────
+        // Info Bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: const BoxDecoration(
@@ -38,7 +148,7 @@ class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
               const Icon(Icons.description_outlined, size: 16),
               const SizedBox(width: 8),
               Text(
-                'DOCUMENT SYNC',
+                'REMOTE COMPILE',
                 style: NBText.label.copyWith(fontSize: 10),
               ),
               const Spacer(),
@@ -66,7 +176,7 @@ class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
         // PDF Info
         if (report != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            padding: const EdgeInsets.all(16),
             child: NBCard(
               padding: const EdgeInsets.all(12),
               fillColor: NBColors.white,
@@ -108,7 +218,7 @@ class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
         // PDF Viewer
         Expanded(
           child: Container(
-            margin: const EdgeInsets.all(16),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             decoration: BoxDecoration(
               border: Border.all(color: NBColors.black, width: 3),
               borderRadius: NBRadius.softAll,
@@ -117,10 +227,15 @@ class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
             child: ClipRRect(
               borderRadius: NBRadius.softAll,
               child: report != null
-                  ? SfPdfViewer.network(
-                      'https://cdn.syncfusion.com/content/PDFViewer/flutter-succinctly.pdf',
-                      key: _pdfViewerKey,
-                    )
+                  ? (report.previewUrl.startsWith('assets/')
+                      ? SfPdfViewer.asset(
+                          report.previewUrl,
+                          key: _pdfViewerKey,
+                        )
+                      : SfPdfViewer.network(
+                          report.previewUrl,
+                          key: _pdfViewerKey,
+                        ))
                   : const Center(
                       child: Text('No report data available'),
                     ),
@@ -132,16 +247,70 @@ class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: NBButton(
-            label: 'Open in Overleaf',
+            label: 'Export to Overleaf',
             fullWidth: true,
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Redirecting to Overleaf...')),
+                const SnackBar(content: Text('Syncing changes to Overleaf...')),
               );
             },
           ),
         ),
       ],
+    );
+  }
+
+  void _showAiAssistDialog(latex) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: NBColors.bg,
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(color: NBColors.black, width: 3),
+          borderRadius: NBRadius.softAll,
+        ),
+        title: Text('LUMINA AI ASSIST', style: NBText.heading3),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('What should I help you with?', style: NBText.bodySmall),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: NBColors.white,
+                border: Border.all(color: NBColors.black, width: 2),
+                borderRadius: NBRadius.softAll,
+              ),
+              child: TextField(
+                controller: controller,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  contentPadding: EdgeInsets.all(12),
+                  border: InputBorder.none,
+                  hintText: 'e.g. Add a section for experimental analysis...',
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('CANCEL', style: NBText.label.copyWith(color: Colors.grey)),
+          ),
+          NBButton(
+            label: 'GENERATE',
+            onTap: () async {
+              final prompt = controller.text;
+              Navigator.pop(context);
+              await latex.generateWithAI(prompt);
+              _editorController.text = latex.currentReport!.rawContent;
+            },
+          ),
+        ],
+      ),
     );
   }
 

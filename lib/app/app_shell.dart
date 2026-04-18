@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:home_widget/home_widget.dart';
 import '../../core/theme/neubrut_tokens.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/dashboard/dashboard_screen.dart';
@@ -19,11 +20,25 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  // ───────────────────────────────────────────────────────────────────
-  //  DEV SETTINGS: 
-  //  Change _currentIndex to 5 to jump straight to the RAG Assistant!
-  // ───────────────────────────────────────────────────────────────────
   int _currentIndex = 0; 
+
+  @override
+  void initState() {
+    super.initState();
+    _setupHomeWidget();
+  }
+
+  void _setupHomeWidget() {
+    HomeWidget.setAppGroupId('group.lockin.widget');
+    HomeWidget.initiallyLaunchedFromHomeWidget().then(_handleWidgetClick);
+    HomeWidget.widgetClicked.listen(_handleWidgetClick);
+  }
+
+  void _handleWidgetClick(Uri? uri) {
+    if (uri != null && (uri.scheme == 'homewidget' || uri.scheme == 'homeWidget') && uri.host == 'log_spend') {
+      setState(() => _currentIndex = 8); // Expenses screen
+    }
+  }
 
   void _onNavigate(int index) {
     setState(() => _currentIndex = index);
@@ -38,7 +53,7 @@ class _AppShellState extends State<AppShell> {
     (Icons.psychology_rounded,      'Focus',     AppColors.primary),
     (Icons.smart_toy_rounded,       'RAG Assistant', AppColors.accent),
     (Icons.groups_rounded,          'Study Hub', AppColors.warning),
-    (Icons.description_rounded,     'LaTeX Preview', AppColors.primary),
+    (Icons.description_rounded,     'LaTeX Workspace', AppColors.primary),
     (Icons.account_balance_wallet_rounded, 'Expenses', AppColors.accent),
   ];
 
