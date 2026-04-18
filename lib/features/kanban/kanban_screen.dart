@@ -67,10 +67,10 @@ class _KanbanScreenState extends State<KanbanScreen> {
           final KanbanStatus newStatus;
 
           if (oldGroupId is int) {
-            taskId = groups[oldGroupId].items[oldItemIndex].taskId;
+            taskId = groups[oldGroupId].items[oldItemIndex!].taskId;
           } else {
             final group = groups.firstWhere((g) => g.id == oldGroupId.toString());
-            taskId = group.items[oldItemIndex].taskId;
+            taskId = group.items[oldItemIndex!].taskId;
           }
 
           if (newGroupId is int) {

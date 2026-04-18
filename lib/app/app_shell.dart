@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/neubrut_tokens.dart';
+import '../../core/theme/app_theme.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/timetable/timetable_screen.dart';
 import '../../features/kanban/kanban_screen.dart';
@@ -24,12 +25,12 @@ class _AppShellState extends State<AppShell> {
 
   // Nav items: icon + label + accent colour
   static const _navItems = [
-    (Icons.dashboard_rounded,       'Home'),
-    (Icons.calendar_month_rounded,  'Schedule'),
-    (Icons.view_kanban_rounded,     'Kanban'),
-    (Icons.fact_check_rounded,      'Attend'),
-    (Icons.psychology_rounded,      'Focus'),
-    (Icons.smart_toy_rounded,       'Ask AI'),
+    (Icons.dashboard_rounded,       'Home',     AppColors.primary),
+    (Icons.calendar_month_rounded,  'Schedule', AppColors.accent),
+    (Icons.view_kanban_rounded,     'Kanban',   AppColors.warning),
+    (Icons.fact_check_rounded,      'Attend',   AppColors.safe),
+    (Icons.psychology_rounded,      'Focus',    AppColors.primary),
+    (Icons.smart_toy_rounded,       'Ask AI',   AppColors.accent),
   ];
 
   @override
@@ -54,7 +55,7 @@ class _AppShellState extends State<AppShell> {
 
   Widget _buildBottomNav() {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: NBColors.white,
         border: const Border(
           top: BorderSide(color: NBColors.black, width: 1.5),
