@@ -98,6 +98,7 @@ class TimetableImportResult {
   final List<ParsedClassSlot> slots;
   final List<ParseIssue> issues;
   final String? errorMessage;
+  final Map<String, dynamic>? fullJson;
 
   const TimetableImportResult._({
     required this.isSuccess,
@@ -107,6 +108,7 @@ class TimetableImportResult {
     required this.slots,
     required this.issues,
     this.errorMessage,
+    this.fullJson,
   });
 
   factory TimetableImportResult.success({
@@ -115,6 +117,7 @@ class TimetableImportResult {
     required String rawText,
     required List<ParsedClassSlot> slots,
     required List<ParseIssue> issues,
+    Map<String, dynamic>? fullJson,
   }) {
     return TimetableImportResult._(
       isSuccess: true,
@@ -123,6 +126,7 @@ class TimetableImportResult {
       rawText: rawText,
       slots: slots,
       issues: issues,
+      fullJson: fullJson,
     );
   }
 
@@ -459,19 +463,36 @@ class TimetableService extends ChangeNotifier {
 
       return TimetableImportResult.success(
         filePath: filePath,
-        sourceType: type,
+        sourceType: sourceType,
         rawText: rawText,
         slots: parsed.slots,
         issues: parsed.issues,
+        fullJson: data,
       );
-    } catch (e) {
+      } catch (e) {
       return TimetableImportResult.failure(
         filePath: filePath,
-        sourceType: type,
+        sourceType: sourceType,
         message: 'Timetable AI import failed: $e',
       );
-    }
-  }
+      }
+      }
+
+      Future<void> saveOcrExtraction(Map<String, dynamic> json) async {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user == null) return;
+
+      try {
+      await client.from('timetable_ocr_extractions').insert({
+        'user_id': user.id,
+        'raw_json': json,
+      });
+      } catch (e) {
+      debugPrint('Error saving OCR extraction: $e');
+      }
+      }
+
 
   void applyImportedSchedule(List<ParsedClassSlot> slots) {
     final byDay = <String, List<TimetableEntry>>{};
