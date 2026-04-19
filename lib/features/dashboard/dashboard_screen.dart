@@ -8,6 +8,7 @@ import '../engine/engine_screen.dart';
 import '../kanban/kanban_screen.dart';
 import '../latex/latex_preview_screen.dart';
 import '../expenses/screens/expense_screen.dart';
+import '../calendar/calendar_heatmap_screen.dart';
 import 'package:intl/intl.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -745,6 +746,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       (Icons.view_kanban_rounded, 'Kanban', NBColors.blue, -2),
       (Icons.description_rounded, 'LaTeX', NBColors.warning, -3),
       (Icons.payments_rounded, 'Spent', NBColors.pink, -4),
+      (Icons.calendar_month_rounded, 'Stress', NBColors.danger, -5),
     ];
 
     return Padding(
@@ -775,6 +777,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           if (a.$4 == -2) Navigator.push(context, MaterialPageRoute(builder: (_) => const KanbanScreen()));
                           if (a.$4 == -3) Navigator.push(context, MaterialPageRoute(builder: (_) => const LaTeXPreviewScreen()));
                           if (a.$4 == -4) Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpenseScreen()));
+                          if (a.$4 == -5) Navigator.push(context, MaterialPageRoute(builder: (_) => const CalendarHeatmapScreen()));
                         }
                       },
                     ),

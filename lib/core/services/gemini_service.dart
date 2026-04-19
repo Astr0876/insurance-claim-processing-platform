@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-/// Drop-in replacement for RunAnywhere's AI features using Gemini API.
+/// Cloud-based AI service using Gemini 2.0 Flash API.
 /// Works on ALL platforms (iOS, Android, web, desktop) with zero native deps.
 class GeminiService {
   static GeminiService? _instance;

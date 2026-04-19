@@ -11,6 +11,7 @@ import '../../features/assistant/assistant_screen.dart';
 import '../../features/study_hub/screens/rooms_screen.dart';
 import '../../features/latex/latex_preview_screen.dart';
 import '../../features/expenses/screens/expense_screen.dart';
+import '../../features/calendar/calendar_heatmap_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../core/providers/app_state.dart';
 import 'package:provider/provider.dart';
@@ -185,6 +186,7 @@ class _AppShellState extends State<AppShell> {
                 _drawerItem(Icons.view_kanban_rounded, 'Kanban Board', NBColors.blue, () => _push(const KanbanScreen())),
                 _drawerItem(Icons.description_rounded, 'LaTeX Workspace', NBColors.warning, () => _push(const LaTeXPreviewScreen())),
                 _drawerItem(Icons.payments_rounded, 'Expense Tracker', NBColors.pink, () => _push(const ExpenseScreen())),
+                _drawerItem(Icons.calendar_month_rounded, 'Stress Heatmap', NBColors.danger, () => _push(const CalendarHeatmapScreen())),
                 const SizedBox(height: 20),
                 _drawerSection('Settings'),
                 _drawerItem(Icons.cloud_download_rounded, 'AI Models', NBColors.purple, () {}),
