@@ -52,14 +52,11 @@ dependencies:
   sqflite: ^2.4.2
   path: ^1.9.1
   connectivity_plus: ^7.1.1
-  runanywhere: ^0.16.0
-  runanywhere_llamacpp: ^0.16.0
-  runanywhere_onnx: ^0.16.0
+  google_generative_ai: ^0.4.7
   record: ^6.2.0
   path_provider: ^2.1.3
   audioplayers: ^6.1.1
   google_mlkit_text_recognition: ^0.15.1
-  google_generative_ai: ^0.4.7
   flutter_tts: ^3.8.5
 
 dependency_overrides:

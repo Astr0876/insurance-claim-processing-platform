@@ -61,10 +61,10 @@ class _AppShellState extends State<AppShell> {
     setState(() => _currentIndex = index);
   }
 
-  void _showRunAnywhereDialog(BuildContext context) {
+  void _showAIDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => const RunAnywhereDialog(),
+      builder: (context) => const LuminaAIDialog(),
     );
   }
 
@@ -107,7 +107,7 @@ class _AppShellState extends State<AppShell> {
       ),
       bottomNavigationBar: _buildBottomNav(),
       floatingActionButton: _currentIndex == 2 ? null : FloatingActionButton(
-        onPressed: () => _showRunAnywhereDialog(context),
+        onPressed: () => _showAIDialog(context),
         backgroundColor: NBColors.primary,
         child: const Icon(Icons.smart_toy_rounded, color: NBColors.black),
       ),
@@ -251,14 +251,14 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
-class RunAnywhereDialog extends StatefulWidget {
-  const RunAnywhereDialog({super.key});
+class LuminaAIDialog extends StatefulWidget {
+  const LuminaAIDialog({super.key});
 
   @override
-  State<RunAnywhereDialog> createState() => _RunAnywhereDialogState();
+  State<LuminaAIDialog> createState() => _LuminaAIDialogState();
 }
 
-class _RunAnywhereDialogState extends State<RunAnywhereDialog> {
+class _LuminaAIDialogState extends State<LuminaAIDialog> {
   final TextEditingController _controller = TextEditingController();
   String _result = "";
   bool _isLoading = false;
@@ -285,7 +285,7 @@ class _RunAnywhereDialogState extends State<RunAnywhereDialog> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('RUN ANYWHERE', style: NBText.heading3),
+                Text('LUMINA AI', style: NBText.heading3),
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.pop(context),

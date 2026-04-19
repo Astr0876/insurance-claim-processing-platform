@@ -2,7 +2,6 @@ import 'dart:math';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:runanywhere/runanywhere.dart';
 import '../utils/constants.dart';
 import 'gradio_service.dart';
 import 'gemini_service.dart';
@@ -33,8 +32,7 @@ class AssistantService extends ChangeNotifier {
   AssistantMode _mode = AssistantMode.standard;
   String? _docId;
   
-  // SDK States (Simulated TensorFlow.js Local)
-// ... existing fields ...
+  // SDK States
   bool _isInitialized = false;
   bool _isModelDownloaded = false;
   bool _isModelLoaded = false;
@@ -60,7 +58,6 @@ class AssistantService extends ChangeNotifier {
   String get statusMessage => _statusMessage;
 
   void setMode(AssistantMode newMode) {
-// ... existing setMode ...
     _mode = newMode;
     if (_mode == AssistantMode.luminaRag && !_isInitialized) {
       setupLumina();
@@ -69,51 +66,42 @@ class AssistantService extends ChangeNotifier {
   }
 
   Future<void> setupLumina() async {
-    _statusMessage = 'Lumina Engine Ready (Remote-AI)';
+    _statusMessage = GeminiService.instance.isInitialized 
+        ? 'Lumina Engine Ready (Gemini AI)'
+        : 'Lumina Engine Ready (Remote-AI)';
     _isInitialized = true;
     _isModelLoaded = true;
+    _isModelDownloaded = true;
     notifyListeners();
   }
 
   Future<void> downloadLumina() async {
-    const modelId = 'smollm2-360m-q8_0';
-    _statusMessage = 'Starting Download...';
+    _statusMessage = 'Initializing Gemini AI...';
     _downloadProgress = 0;
     notifyListeners();
 
-    try {
-      await for (final progress in RunAnywhere.downloadModel(modelId)) {
-        _downloadProgress = progress.percentage;
-        _statusMessage = 'Downloading Model: ${(_downloadProgress * 100).toStringAsFixed(1)}%';
-        notifyListeners();
-        if (progress.state.isCompleted) break;
-      }
-
-      _statusMessage = 'Loading Model...';
+    // Gemini is cloud-based — simulate quick init
+    for (int i = 1; i <= 5; i++) {
+      _downloadProgress = i / 5;
+      _statusMessage = 'Loading AI: ${(_downloadProgress * 100).toStringAsFixed(0)}%';
       notifyListeners();
-      await RunAnywhere.loadModel(modelId);
-
-      _isModelDownloaded = true;
-      _isModelLoaded = true;
-      _statusMessage = 'Lumina Engine Loaded';
-      notifyListeners();
-    } catch (e) {
-      _statusMessage = 'Download Error: $e';
-      notifyListeners();
+      await Future.delayed(const Duration(milliseconds: 300));
     }
+
+    _isModelDownloaded = true;
+    _isModelLoaded = true;
+    _statusMessage = GeminiService.instance.isInitialized
+        ? 'Lumina Engine Loaded (Gemini AI)'
+        : 'Lumina Engine Loaded';
+    notifyListeners();
   }
 
   Future<void> loadLumina() async {
-    const modelId = 'smollm2-360m-q8_0';
-    try {
-      await RunAnywhere.loadModel(modelId);
-      _isModelLoaded = true;
-      _statusMessage = 'Lumina is Ready (On-Device)';
-      notifyListeners();
-    } catch (e) {
-      _statusMessage = 'Load Error: $e';
-      notifyListeners();
-    }
+    _isModelLoaded = true;
+    _statusMessage = GeminiService.instance.isInitialized
+        ? 'Lumina is Ready (Gemini AI)'
+        : 'Lumina is Ready';
+    notifyListeners();
   }
 
   bool _isIndexingPaused = false;
@@ -121,12 +109,11 @@ class AssistantService extends ChangeNotifier {
 
   void setIndexingPaused(bool paused) {
     _isIndexingPaused = paused;
-    _statusMessage = paused ? 'Indexing Paused (Power Saving)' : 'Lumina is Ready (Local)';
+    _statusMessage = paused ? 'Indexing Paused (Power Saving)' : 'Lumina is Ready';
     notifyListeners();
   }
 
   Future<void> indexDocument(String content) async {
-// ... existing indexDocument ...
     if (_isIndexingPaused) {
       debugPrint("[Power Saving] Indexing skipped: Battery Guardian Active.");
       return;
@@ -149,12 +136,11 @@ class AssistantService extends ChangeNotifier {
     _hasDocument = true;
     _isIndexing = false;
     _indexingProgress = 1.0;
-    _statusMessage = 'Lumina is Ready (Local)';
+    _statusMessage = 'Lumina is Ready';
     notifyListeners();
   }
 
   Future<bool> uploadNotesToAI(File file) async {
-// ... existing uploadNotesToAI ...
     _isIndexing = true;
     _indexingProgress = 0.2;
     _statusMessage = 'Uploading notes to AI...';
@@ -316,7 +302,7 @@ class AssistantService extends ChangeNotifier {
 
   Stream<String> getAnswerStream(String query) async* {
     if (_mode == AssistantMode.standard) {
-      // Try Gemini first (works everywhere)
+      // Use Gemini AI (works everywhere)
       if (GeminiService.instance.isInitialized) {
         yield "🧠 [Gemini AI] Thinking...\n\n";
         try {
@@ -325,29 +311,11 @@ class AssistantService extends ChangeNotifier {
           }
           return;
         } catch (e) {
-          yield "Gemini error: $e. Falling back...\n\n";
+          yield "AI error: $e\n\n";
         }
       }
       
-      // Then try RunAnywhere on-device
-      if (_isModelLoaded) {
-        yield "🧠 [On-Device LLM] Thinking...\n\n";
-        try {
-          final streamResult = await RunAnywhere.generateStream(
-            query,
-            options: LLMGenerationOptions(
-              maxTokens: 500,
-              systemPrompt: "You are Lumina, a proactive student sidekick. Keep answers helpful and concise.",
-            ),
-          );
-          await for (final token in streamResult.stream) {
-            yield token;
-          }
-          return;
-        } catch (e) {
-          yield "On-device error: $e. Falling back to simple response.\n\n";
-        }
-      }
+      // Fallback to local search
       yield await askQuestion(query);
       return;
     }
@@ -396,20 +364,12 @@ class AssistantService extends ChangeNotifier {
       }
     }
 
-    // Try on-device chat if model loaded
-    if (_isModelLoaded) {
-      try {
-        return await RunAnywhere.chat(query);
-      } catch (e) {
-        debugPrint('On-device chat error: $e');
-      }
-    }
-
+    // Fallback to local search
     final results = _internalSearch(query);
 
     if (results.isEmpty) {
       if (lowerQuery.contains('hi') || lowerQuery.contains('hello')) {
-        return "Hello Renee! How can I help with your studies today?";
+        return "Hello! How can I help with your studies today?";
       }
       return "No results found in your notes for \"$query\".";
     }
@@ -422,13 +382,10 @@ class AssistantService extends ChangeNotifier {
   }
 
   List<SearchResult> _internalSearch(String query) {
-// ... existing _internalSearch ...
     if (!_hasDocument || query.trim().isEmpty) {
       return [];
     }
     
-    // Simulated TF.js local vectorization logic
-    // We treat each paragraph as an "embedding" and compute similarity via keyword overlap (as a proxy)
     final queryWords = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.length >= 2).toList();
     if (queryWords.isEmpty) {
       return [];
