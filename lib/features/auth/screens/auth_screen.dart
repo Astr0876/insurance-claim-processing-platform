@@ -48,6 +48,12 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
+  void _enterDemoMode() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const AppShell()),
+    );
+  }
+
   Future<void> _authenticate() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -64,9 +70,7 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final supabase = Supabase.instance.client;
@@ -76,49 +80,55 @@ class _AuthScreenState extends State<AuthScreen> {
           password: password,
         );
       } else {
-        await supabase.auth.signUp(
+        // Sign up and auto-sign-in
+        final response = await supabase.auth.signUp(
           email: email,
           password: password,
         );
+        
+        // If email confirmation is required, the session may be null
+        // In that case, try signing in directly
+        if (response.session == null && response.user != null) {
+          // Try immediate sign in (works if email confirmation is disabled)
+          try {
+            await supabase.auth.signInWithPassword(
+              email: email,
+              password: password,
+            );
+          } catch (_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Account created! Check your email to confirm, or use Demo Mode.'),
+                  backgroundColor: NBColors.blue,
+                  duration: Duration(seconds: 4),
+                ),
+              );
+            }
+          }
+        }
       }
-      
-      // Navigation to AppShell is handled by onAuthStateChange listener in initState
     } on AuthException catch (e) {
       if (mounted) {
-        String errorMessage = e.message;
-        if (e.message.toLowerCase().contains('user already exists')) {
-          errorMessage = 'User already exists. Please sign in instead.';
-        } else if (e.message.toLowerCase().contains('email not confirmed')) {
-          errorMessage = 'Login failed: Email not confirmed. Please disable "Confirm email" in your Supabase Dashboard settings.';
-        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
+            content: Text(e.message),
             backgroundColor: NBColors.danger,
-            duration: const Duration(seconds: 5),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {},
-            ),
+            duration: const Duration(seconds: 4),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('An unexpected error occurred.'),
+          SnackBar(
+            content: Text('Error: $e'),
             backgroundColor: NBColors.danger,
           ),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -132,8 +142,8 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 48),
-              // Logo or Icon
+              const SizedBox(height: 40),
+              // Logo
               Center(
                 child: Container(
                   width: 80,
@@ -151,11 +161,17 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               Text(
                 'LUMINA',
                 textAlign: TextAlign.center,
                 style: NBText.heading1.copyWith(letterSpacing: 4),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'The Proactive Engineering Sidekick',
+                textAlign: TextAlign.center,
+                style: NBText.bodySmall.copyWith(color: const Color(0xFF777777)),
               ),
               const SizedBox(height: 8),
               Text(
@@ -163,7 +179,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 textAlign: TextAlign.center,
                 style: NBText.body,
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
 
               // Inputs
               Text('EMAIL', style: NBText.label),
@@ -173,7 +189,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 hintText: 'student@university.edu',
                 keyboardType: TextInputType.emailAddress,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               
               Text('PASSWORD', style: NBText.label),
               const SizedBox(height: 8),
@@ -182,7 +198,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 hintText: '••••••••',
                 obscureText: true,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
               if (_isLoading)
                 const Center(
@@ -199,13 +215,11 @@ class _AuthScreenState extends State<AuthScreen> {
                   fullWidth: true,
                 ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              
+              // Toggle sign in / sign up
               GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isLogin = !_isLogin;
-                  });
-                },
+                onTap: () => setState(() => _isLogin = !_isLogin),
                 child: Text(
                   _isLogin 
                       ? 'Don\'t have an account? Sign Up' 
@@ -215,6 +229,52 @@ class _AuthScreenState extends State<AuthScreen> {
                     fontWeight: FontWeight.bold,
                     decoration: TextDecoration.underline,
                   ),
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // ── DEMO MODE ─────────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: NBColors.purple.withValues(alpha: 0.1),
+                  border: Border.all(color: NBColors.black, width: 2),
+                  borderRadius: NBRadius.softAll,
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'HACKATHON DEMO',
+                      style: NBText.label.copyWith(fontSize: 10, color: NBColors.purple),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Skip login and explore all features with sample data',
+                      textAlign: TextAlign.center,
+                      style: NBText.bodySmall.copyWith(fontSize: 11),
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: _enterDemoMode,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: NBColors.purple,
+                          border: Border.all(color: NBColors.black, width: 2),
+                          borderRadius: NBRadius.softAll,
+                          boxShadow: NBShadows.small,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '⚡ ENTER DEMO MODE',
+                            style: NBText.label.copyWith(fontSize: 12, letterSpacing: 1),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

@@ -58,11 +58,15 @@ class CalendarService extends ChangeNotifier {
   int _emailsScanned = 0;
   int _eventsFound = 0;
 
+
+  static const _clientId = '281609918138-v038qckesd26sq7puc39m7bpe4ueob0e.apps.googleusercontent.com';
+
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: [
       calendar_api.CalendarApi.calendarScope,
       gmail_api.GmailApi.gmailReadonlyScope,
     ],
+    serverClientId: _clientId,
   );
 
   List<AcademicDeadline> get deadlines => _deadlines;
@@ -128,6 +132,10 @@ class CalendarService extends ChangeNotifier {
     try {
       final account = await _googleSignIn.signIn();
       if (account == null) {
+        _syncError = 'Google Sign-In was cancelled. Demo data loaded.';
+        if (_deadlines.isEmpty && _calendarEvents.isEmpty) {
+          loadDemoData();
+        }
         _isSyncing = false;
         notifyListeners();
         return;

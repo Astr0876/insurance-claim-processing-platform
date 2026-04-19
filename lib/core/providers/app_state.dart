@@ -172,7 +172,7 @@ class AppState extends ChangeNotifier {
         // 1. Save slots to timetable_entries
         // First, clear existing entries if user wants a full replace, or just append
         // For simplicity, let's append but in a real app we might ask.
-        final entriesToInsert = slots.map((s) => {
+        final entriesToInsert = slots.map((s) => <String, dynamic>{
           'user_id': user.id,
           'day': s.day,
           'subject': s.subject,
