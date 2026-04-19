@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
 import '../utils/constants.dart';
 import 'gradio_service.dart';
+import 'gemini_service.dart';
 import '../../features/assistant/models/assistant_graph_models.dart';
 
 class SearchResult {
@@ -315,6 +316,20 @@ class AssistantService extends ChangeNotifier {
 
   Stream<String> getAnswerStream(String query) async* {
     if (_mode == AssistantMode.standard) {
+      // Try Gemini first (works everywhere)
+      if (GeminiService.instance.isInitialized) {
+        yield "🧠 [Gemini AI] Thinking...\n\n";
+        try {
+          await for (final token in GeminiService.instance.chatStream(query)) {
+            yield token;
+          }
+          return;
+        } catch (e) {
+          yield "Gemini error: $e. Falling back...\n\n";
+        }
+      }
+      
+      // Then try RunAnywhere on-device
       if (_isModelLoaded) {
         yield "🧠 [On-Device LLM] Thinking...\n\n";
         try {
@@ -371,6 +386,15 @@ class AssistantService extends ChangeNotifier {
 
   Future<String> askQuestion(String query) async {
     final lowerQuery = query.toLowerCase();
+
+    // Try Gemini AI first
+    if (GeminiService.instance.isInitialized) {
+      try {
+        return await GeminiService.instance.chat(query);
+      } catch (e) {
+        debugPrint('Gemini chat error: $e');
+      }
+    }
 
     // Try on-device chat if model loaded
     if (_isModelLoaded) {

@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<HorizontalScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/kanban_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:padding="6dp"
+    android:scrollbars="none"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <!-- TODO Column -->
+        <LinearLayout
+            android:layout_width="160dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/widget_bg"
+            android:orientation="vertical"
+            android:padding="10dp"
+            android:layout_marginEnd="6dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/kanban_todo_header"
+                android:padding="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="TO DO"
+                    android:textStyle="bold"
+                    android:textColor="#000000"
+                    android:textSize="10sp" />
+                <TextView
+                    android:id="@+id/kanban_todo_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textStyle="bold"
+                    android:textColor="#000000"
+                    android:textSize="10sp"
+                    android:background="#FFFFFF"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#000000"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:id="@+id/kanban_todo_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="• Design mockups"
+                android:textColor="#000000"
+                android:textSize="11sp"
+                android:lineSpacingExtra="4dp" />
+        </LinearLayout>
+
+        <!-- DOING Column -->
+        <LinearLayout
+            android:layout_width="160dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/widget_bg"
+            android:orientation="vertical"
+            android:padding="10dp"
+            android:layout_marginEnd="6dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/kanban_doing_header"
+                android:padding="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="DOING"
+                    android:textStyle="bold"
+                    android:textColor="#000000"
+                    android:textSize="10sp" />
+                <TextView
+                    android:id="@+id/kanban_doing_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textStyle="bold"
+                    android:textColor="#000000"
+                    android:textSize="10sp"
+                    android:background="#FFFFFF"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#000000"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:id="@+id/kanban_doing_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="• Build feature"
+                android:textColor="#000000"
+                android:textSize="11sp"
+                android:lineSpacingExtra="4dp" />
+        </LinearLayout>
+
+        <!-- DONE Column -->
+        <LinearLayout
+            android:layout_width="160dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/widget_bg"
+            android:orientation="vertical"
+            android:padding="10dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/kanban_done_header"
+                android:padding="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="DONE"
+                    android:textStyle="bold"
+                    android:textColor="#000000"
+                    android:textSize="10sp" />
+                <TextView
+                    android:id="@+id/kanban_done_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textStyle="bold"
+                    android:textColor="#000000"
+                    android:textSize="10sp"
+                    android:background="#FFFFFF"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#000000"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:id="@+id/kanban_done_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="• Setup repo"
+                android:textColor="#000000"
+                android:textSize="11sp"
+                android:lineSpacingExtra="4dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</HorizontalScrollView>

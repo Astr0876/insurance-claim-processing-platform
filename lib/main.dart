@@ -1,3 +1,6 @@
+import 'dart:ffi';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -10,43 +13,84 @@ import 'core/providers/app_state.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/neubrut_tokens.dart';
 import 'core/utils/constants.dart';
+import 'core/services/gemini_service.dart';
+import 'core/services/home_widget_service.dart';
 import 'app/app_shell.dart';
 import 'features/study_hub/services/hub_service.dart';
 import 'features/auth/screens/auth_screen.dart';
 
+/// Whether RunAnywhere AI features are available on this device.
+/// Set to false if native library initialization fails (e.g. on simulators).
+bool isRunAnywhereAvailable = false;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 1. Initialize RunAnywhere SDK
-  await RunAnywhere.initialize();
-  await LlamaCpp.register();
-  await Onnx.register();
+  // 1. Initialize RunAnywhere SDK (graceful degradation)
+  // The native C++ library crashes (SIGSEGV) on iOS simulators because some
+  // native symbols are missing. We probe for a critical symbol first — if it's
+  // not found, we skip SDK init to prevent the crash.
+  bool skipRunAnywhere = false;
+  if (Platform.isIOS) {
+    try {
+      final dylib = DynamicLibrary.process();
+      dylib.lookup('rac_device_set_callbacks');
+      // Symbol found — safe to proceed
+    } catch (_) {
+      // Symbol missing — this device/simulator will crash, skip init
+      skipRunAnywhere = true;
+      debugPrint('ℹ️ RunAnywhere native symbols not available — skipping SDK init');
+    }
+  }
+  
+  if (!skipRunAnywhere) {
+    try {
+      await RunAnywhere.initialize();
+      await LlamaCpp.register();
+      await Onnx.register();
 
-  // 2. Register Models
-  LlamaCpp.addModel(
-    id: 'smollm2-360m-q8_0',
-    name: 'SmolLM2 360M Q8_0',
-    url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
-    memoryRequirement: 500000000,
-  );
+      // 2. Register Models
+      LlamaCpp.addModel(
+        id: 'smollm2-360m-q8_0',
+        name: 'SmolLM2 360M Q8_0',
+        url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+        memoryRequirement: 500000000,
+      );
 
-  // STT Model
-  Onnx.addModel(
-    id: 'sherpa-onnx-whisper-tiny.en',
-    name: 'Whisper Tiny English',
-    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
-    modality: ModelCategory.speechRecognition,
-  );
+      // STT Model
+      Onnx.addModel(
+        id: 'sherpa-onnx-whisper-tiny.en',
+        name: 'Whisper Tiny English',
+        url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+        modality: ModelCategory.speechRecognition,
+      );
 
-  // TTS Model
-  Onnx.addModel(
-    id: 'vits-piper-en_US-lessac-medium',
-    name: 'Piper US English (Lessac)',
-    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
-    modality: ModelCategory.speechSynthesis,
-  );
+      // TTS Model
+      Onnx.addModel(
+        id: 'vits-piper-en_US-lessac-medium',
+        name: 'Piper US English (Lessac)',
+        url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
+        modality: ModelCategory.speechSynthesis,
+      );
+
+      isRunAnywhereAvailable = true;
+      debugPrint('✅ RunAnywhere SDK initialized successfully');
+    } catch (e) {
+      isRunAnywhereAvailable = false;
+      debugPrint('⚠️ RunAnywhere SDK init failed (AI features disabled): $e');
+    }
+  } else {
+    isRunAnywhereAvailable = false;
+    debugPrint('ℹ️ RunAnywhere SDK skipped on iOS simulator (native lib not compatible)');
+  }
 
   await dotenv.load(fileName: ".env");
+
+  // Initialize Gemini AI (works on all platforms, no native deps)
+  await GeminiService.instance.initialize();
+
+  // Register home widget background callbacks (attend/skip buttons)
+  await HomeWidgetService.setupBackground();
 
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,

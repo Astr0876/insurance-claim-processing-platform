@@ -292,11 +292,6 @@ class AppState extends ChangeNotifier {
         nextClassLabel = nextClass.subject;
         nextClassTime = nextClass.time;
       }
-
-      // 2. If logged in, we could potentially fetch the very latest from DB, 
-      // but services should already be updated by initialize() or other methods.
-      // So we rely on service state which is the "source of truth" in the app.
-      
     } catch (e) {
       debugPrint('Error refreshing widget snapshot: $e');
     }
@@ -311,5 +306,29 @@ class AppState extends ChangeNotifier {
 
     _widgetSnapshot = newSnapshot;
     await HomeWidgetService.updateWidget(newSnapshot);
+
+    // Update Attendance Widget with attend/skip predictions
+    final totalAttended = attendance.records.values.fold<int>(0, (s, r) => s + r.attended);
+    final totalClasses = attendance.records.values.fold<int>(0, (s, r) => s + r.total);
+    final ifAttendPct = totalClasses > 0 ? ((totalAttended + 1) / (totalClasses + 1)) * 100 : 100.0;
+    final ifSkipPct = totalClasses > 0 ? (totalAttended / (totalClasses + 1)) * 100 : 0.0;
+    
+    await HomeWidgetService.updateAttendanceWidget(
+      nextClass: nextClassLabel,
+      nextTime: nextClassTime,
+      currentPct: attendancePct,
+      ifAttendPct: ifAttendPct,
+      ifSkipPct: ifSkipPct,
+      risk: risk,
+      safeBunks: attendance.totalSafeBunks,
+    );
+
+    // Update Kanban Widget
+    await HomeWidgetService.updateKanbanWidget(
+      todoTasks: kanban.todoTasks.map((t) => t.title).toList(),
+      doingTasks: kanban.doingTasks.map((t) => t.title).toList(),
+      doneTasks: kanban.doneTasks.map((t) => t.title).toList(),
+    );
   }
 }
+
