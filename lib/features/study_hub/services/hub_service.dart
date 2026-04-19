@@ -340,8 +340,53 @@ class HubService extends ChangeNotifier {
     studySession = null;
     notifyListeners();
 
+    // Always ensure realtime is connected
     if (!isConnected) {
-      _loadDemoState(room.id);
+      connect();
+    }
+
+    // Fetch message history from Supabase
+    _fetchMessageHistory(room.id);
+    // Load demo state as immediate fallback UI
+    _loadDemoState(room.id);
+  }
+
+  Future<void> _fetchMessageHistory(String roomId) async {
+    try {
+      final data = await _supabase
+          .from('hub_messages')
+          .select()
+          .eq('room_id', roomId)
+          .order('created_at', ascending: true)
+          .limit(50);
+
+      if (data.isNotEmpty) {
+        messages = data.map((record) {
+          final sId = record['sender_id']?.toString() ?? '';
+          String sName = 'Student';
+          if (currentRoom != null) {
+            final member = currentRoom!.members.firstWhere(
+              (m) => m.userId == sId,
+              orElse: () => RoomMember(userId: sId, name: 'Student', role: 'viewer', joinedAt: ''),
+            );
+            sName = member.name;
+          }
+          return HubMessage(
+            id: record['id']?.toString() ?? '',
+            roomId: record['room_id']?.toString() ?? '',
+            senderId: sId,
+            senderName: sName,
+            content: record['content']?.toString() ?? '',
+            type: record['type']?.toString() ?? 'text',
+            createdAt: record['created_at']?.toString() ?? '',
+            readBy: [],
+          );
+        }).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('HubService: Could not fetch message history: $e');
+      // Demo data already loaded as fallback
     }
   }
 
