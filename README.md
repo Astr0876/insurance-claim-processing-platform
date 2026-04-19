@@ -33,6 +33,8 @@ Create a `.env` file in the project root:
 ```env
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_AUTH_REDIRECT_URL=lumina://auth/callback
+GOOGLE_WEB_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
 GEMINI_API_KEY=your-gemini-api-key
 ```
 
@@ -40,6 +42,8 @@ GEMINI_API_KEY=your-gemini-api-key
 |----------|----------|-------------|
 | `SUPABASE_URL` | ✅ | Your Supabase project URL |
 | `SUPABASE_ANON_KEY` | ✅ | Supabase anonymous API key |
+| `SUPABASE_AUTH_REDIRECT_URL` | ⚠️ | Redirect URL used in Supabase auth emails. Use your app deep link (recommended) or your production web callback URL. |
+| `GOOGLE_WEB_CLIENT_ID` | ⚠️ | Google OAuth Web Client ID used by Google Sign-In (`*.apps.googleusercontent.com`). |
 | `GEMINI_API_KEY` | ⚠️ | Google Gemini API key (for AI features). Get one at [aistudio.google.com](https://aistudio.google.com) |
 
 ---

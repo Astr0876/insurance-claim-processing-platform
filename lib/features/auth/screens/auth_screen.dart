@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/utils/constants.dart';
 import '../../../core/theme/neubrut_tokens.dart';
 import '../../../core/widgets/nb_button.dart';
 import '../../../core/widgets/nb_input.dart';
@@ -17,7 +18,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   late final StreamSubscription<AuthState> _authStateSubscription;
-  
+
   bool _isLogin = true;
   bool _isLoading = false;
 
@@ -28,16 +29,17 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _setupAuthListener() {
-    _authStateSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      final session = data.session;
-      if (session != null) {
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const AppShell()),
-          );
-        }
-      }
-    });
+    _authStateSubscription = Supabase.instance.client.auth.onAuthStateChange
+        .listen((data) {
+          final session = data.session;
+          if (session != null) {
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const AppShell()),
+              );
+            }
+          }
+        });
   }
 
   @override
@@ -49,9 +51,9 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _enterDemoMode() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const AppShell()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const AppShell()));
   }
 
   Future<void> _authenticate() async {
@@ -84,8 +86,9 @@ class _AuthScreenState extends State<AuthScreen> {
         final response = await supabase.auth.signUp(
           email: email,
           password: password,
+          emailRedirectTo: AppConstants.supabaseAuthRedirectUrl,
         );
-        
+
         // If email confirmation is required, the session may be null
         // In that case, try signing in directly
         if (response.session == null && response.user != null) {
@@ -99,7 +102,9 @@ class _AuthScreenState extends State<AuthScreen> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Account created! Check your email to confirm, or use Demo Mode.'),
+                  content: Text(
+                    'Account created! Check your email to confirm, or use Demo Mode.',
+                  ),
                   backgroundColor: NBColors.blue,
                   duration: Duration(seconds: 4),
                 ),
@@ -171,11 +176,15 @@ class _AuthScreenState extends State<AuthScreen> {
               Text(
                 'The Proactive Engineering Sidekick',
                 textAlign: TextAlign.center,
-                style: NBText.bodySmall.copyWith(color: const Color(0xFF777777)),
+                style: NBText.bodySmall.copyWith(
+                  color: const Color(0xFF777777),
+                ),
               ),
               const SizedBox(height: 8),
               Text(
-                _isLogin ? 'Welcome back! Let\'s lock in.' : 'Create an account to start.',
+                _isLogin
+                    ? 'Welcome back! Let\'s lock in.'
+                    : 'Create an account to start.',
                 textAlign: TextAlign.center,
                 style: NBText.body,
               ),
@@ -190,7 +199,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 20),
-              
+
               Text('PASSWORD', style: NBText.label),
               const SizedBox(height: 8),
               NBInput(
@@ -216,13 +225,13 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
 
               const SizedBox(height: 16),
-              
+
               // Toggle sign in / sign up
               GestureDetector(
                 onTap: () => setState(() => _isLogin = !_isLogin),
                 child: Text(
-                  _isLogin 
-                      ? 'Don\'t have an account? Sign Up' 
+                  _isLogin
+                      ? 'Don\'t have an account? Sign Up'
                       : 'Already have an account? Sign In',
                   textAlign: TextAlign.center,
                   style: NBText.bodySmall.copyWith(
@@ -246,7 +255,10 @@ class _AuthScreenState extends State<AuthScreen> {
                   children: [
                     Text(
                       'HACKATHON DEMO',
-                      style: NBText.label.copyWith(fontSize: 10, color: NBColors.purple),
+                      style: NBText.label.copyWith(
+                        fontSize: 10,
+                        color: NBColors.purple,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -269,7 +281,10 @@ class _AuthScreenState extends State<AuthScreen> {
                         child: Center(
                           child: Text(
                             '⚡ ENTER DEMO MODE',
-                            style: NBText.label.copyWith(fontSize: 12, letterSpacing: 1),
+                            style: NBText.label.copyWith(
+                              fontSize: 12,
+                              letterSpacing: 1,
+                            ),
                           ),
                         ),
                       ),

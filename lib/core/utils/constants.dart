@@ -7,47 +7,147 @@ class AppConstants {
 
   static String get supabaseUrl => dotenv.env['SUPABASE_URL'] ?? '';
   static String get supabaseAnonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? '';
-  
+  static const bool _isProduction = bool.fromEnvironment('dart.vm.product');
+
+  static String? get supabaseAuthRedirectUrl {
+    final raw = dotenv.env['SUPABASE_AUTH_REDIRECT_URL']?.trim();
+    if (raw == null || raw.isEmpty) return null;
+    final lowerRaw = raw.toLowerCase();
+    if (lowerRaw.startsWith('your_') ||
+        lowerRaw.startsWith('your-') ||
+        lowerRaw.contains('your-domain.com')) {
+      return null;
+    }
+
+    final uri = Uri.tryParse(raw);
+    if (uri == null || !uri.hasScheme) return null;
+
+    final isHttp = uri.scheme == 'http' || uri.scheme == 'https';
+    if (isHttp) {
+      if (uri.host.isEmpty) return null;
+      final isLocalhost = uri.host == 'localhost' || uri.host == '127.0.0.1';
+      if (_isProduction && isLocalhost) return null;
+      if (uri.scheme == 'http' && !isLocalhost) return null;
+    }
+
+    return raw;
+  }
+
   // Demo timetable data
   static const List<Map<String, dynamic>> demoTimetable = [
     {
       'day': 'Monday',
       'classes': [
-        {'subject': 'Data Structures', 'time': '9:00 AM', 'room': 'LH-201', 'duration': 60},
-        {'subject': 'Operating Systems', 'time': '11:00 AM', 'room': 'LH-305', 'duration': 60},
-        {'subject': 'DBMS Lab', 'time': '2:00 PM', 'room': 'Lab-4', 'duration': 120},
+        {
+          'subject': 'Data Structures',
+          'time': '9:00 AM',
+          'room': 'LH-201',
+          'duration': 60,
+        },
+        {
+          'subject': 'Operating Systems',
+          'time': '11:00 AM',
+          'room': 'LH-305',
+          'duration': 60,
+        },
+        {
+          'subject': 'DBMS Lab',
+          'time': '2:00 PM',
+          'room': 'Lab-4',
+          'duration': 120,
+        },
       ],
     },
     {
       'day': 'Tuesday',
       'classes': [
-        {'subject': 'Computer Networks', 'time': '9:00 AM', 'room': 'LH-101', 'duration': 60},
-        {'subject': 'Data Structures', 'time': '11:00 AM', 'room': 'LH-201', 'duration': 60},
-        {'subject': 'Mathematics III', 'time': '1:00 PM', 'room': 'LH-102', 'duration': 60},
+        {
+          'subject': 'Computer Networks',
+          'time': '9:00 AM',
+          'room': 'LH-101',
+          'duration': 60,
+        },
+        {
+          'subject': 'Data Structures',
+          'time': '11:00 AM',
+          'room': 'LH-201',
+          'duration': 60,
+        },
+        {
+          'subject': 'Mathematics III',
+          'time': '1:00 PM',
+          'room': 'LH-102',
+          'duration': 60,
+        },
       ],
     },
     {
       'day': 'Wednesday',
       'classes': [
-        {'subject': 'Operating Systems', 'time': '10:00 AM', 'room': 'LH-305', 'duration': 60},
-        {'subject': 'Software Engineering', 'time': '12:00 PM', 'room': 'LH-201', 'duration': 60},
-        {'subject': 'CN Lab', 'time': '2:00 PM', 'room': 'Lab-2', 'duration': 120},
+        {
+          'subject': 'Operating Systems',
+          'time': '10:00 AM',
+          'room': 'LH-305',
+          'duration': 60,
+        },
+        {
+          'subject': 'Software Engineering',
+          'time': '12:00 PM',
+          'room': 'LH-201',
+          'duration': 60,
+        },
+        {
+          'subject': 'CN Lab',
+          'time': '2:00 PM',
+          'room': 'Lab-2',
+          'duration': 120,
+        },
       ],
     },
     {
       'day': 'Thursday',
       'classes': [
-        {'subject': 'Mathematics III', 'time': '9:00 AM', 'room': 'LH-102', 'duration': 60},
-        {'subject': 'Computer Networks', 'time': '11:00 AM', 'room': 'LH-101', 'duration': 60},
-        {'subject': 'Data Structures', 'time': '2:00 PM', 'room': 'LH-201', 'duration': 60},
+        {
+          'subject': 'Mathematics III',
+          'time': '9:00 AM',
+          'room': 'LH-102',
+          'duration': 60,
+        },
+        {
+          'subject': 'Computer Networks',
+          'time': '11:00 AM',
+          'room': 'LH-101',
+          'duration': 60,
+        },
+        {
+          'subject': 'Data Structures',
+          'time': '2:00 PM',
+          'room': 'LH-201',
+          'duration': 60,
+        },
       ],
     },
     {
       'day': 'Friday',
       'classes': [
-        {'subject': 'Software Engineering', 'time': '9:00 AM', 'room': 'LH-201', 'duration': 60},
-        {'subject': 'Operating Systems', 'time': '11:00 AM', 'room': 'LH-305', 'duration': 60},
-        {'subject': 'DS Lab', 'time': '2:00 PM', 'room': 'Lab-3', 'duration': 120},
+        {
+          'subject': 'Software Engineering',
+          'time': '9:00 AM',
+          'room': 'LH-201',
+          'duration': 60,
+        },
+        {
+          'subject': 'Operating Systems',
+          'time': '11:00 AM',
+          'room': 'LH-305',
+          'duration': 60,
+        },
+        {
+          'subject': 'DS Lab',
+          'time': '2:00 PM',
+          'room': 'Lab-3',
+          'duration': 120,
+        },
       ],
     },
   ];
