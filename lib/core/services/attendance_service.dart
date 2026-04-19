@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 import '../utils/constants.dart';
 
 class AttendanceAnalytics {
@@ -70,10 +71,78 @@ class AttendanceRecord {
 class AttendanceService extends ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
   Map<String, AttendanceRecord> _records = {};
+  
+  // Semester dates for proper bunk analytics
+  DateTime? _semesterStart;
+  DateTime? _semesterEnd;
 
   Map<String, AttendanceRecord> get records => _records;
-
+  DateTime? get semesterStart => _semesterStart;
+  DateTime? get semesterEnd => _semesterEnd;
+  
   String? get _userId => _supabase.auth.currentUser?.id;
+
+  /// How many weeks remain in the semester
+  int get weeksRemaining {
+    if (_semesterEnd == null) return 0;
+    final now = DateTime.now();
+    if (now.isAfter(_semesterEnd!)) return 0;
+    return ((_semesterEnd!.difference(now).inDays) / 7).ceil();
+  }
+
+  /// Total semester weeks
+  int get totalSemesterWeeks {
+    if (_semesterStart == null || _semesterEnd == null) return 16; // default
+    return ((_semesterEnd!.difference(_semesterStart!).inDays) / 7).ceil();
+  }
+
+  /// Semester progress percentage
+  double get semesterProgress {
+    if (_semesterStart == null || _semesterEnd == null) return 0.0;
+    final total = _semesterEnd!.difference(_semesterStart!).inDays;
+    if (total <= 0) return 100.0;
+    final elapsed = DateTime.now().difference(_semesterStart!).inDays;
+    return ((elapsed / total) * 100).clamp(0.0, 100.0);
+  }
+
+  /// Set semester dates and save to Supabase
+  Future<void> setSemesterDates(DateTime start, DateTime end) async {
+    _semesterStart = start;
+    _semesterEnd = end;
+    notifyListeners();
+
+    final userId = _userId;
+    if (userId == null) return;
+    try {
+      await _supabase.from('user_settings').upsert({
+        'user_id': userId,
+        'semester_start': DateFormat('yyyy-MM-dd').format(start),
+        'semester_end': DateFormat('yyyy-MM-dd').format(end),
+      });
+    } catch (e) {
+      debugPrint('Error saving semester dates: $e');
+    }
+  }
+
+  /// Fetch semester dates from Supabase
+  Future<void> fetchSemesterDates() async {
+    final userId = _userId;
+    if (userId == null) return;
+    try {
+      final result = await _supabase
+          .from('user_settings')
+          .select('semester_start, semester_end')
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (result != null) {
+        _semesterStart = DateTime.tryParse(result['semester_start'] ?? '');
+        _semesterEnd = DateTime.tryParse(result['semester_end'] ?? '');
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error fetching semester dates: $e');
+    }
+  }
 
   Future<void> fetchRecords() async {
     final userId = _userId;

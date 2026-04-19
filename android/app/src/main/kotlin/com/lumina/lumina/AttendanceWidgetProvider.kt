@@ -14,14 +14,14 @@ class AttendanceWidgetProvider : HomeWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray, widgetData: SharedPreferences) {
         for (appWidgetId in appWidgetIds) {
             val views = RemoteViews(context.packageName, R.layout.attendance_widget_layout).apply {
-                // Get data from Flutter
-                val nextClass = widgetData.getString("att_next_class", "No class")
-                val nextTime = widgetData.getString("att_next_time", "--:--")
-                val currentPct = widgetData.getFloat("att_current_pct", 75f)
-                val ifAttendPct = widgetData.getFloat("att_if_attend_pct", 76f)
-                val ifSkipPct = widgetData.getFloat("att_if_skip_pct", 74f)
-                val risk = widgetData.getString("att_risk", "LOW")
-                val safeBunks = widgetData.getInt("att_safe_bunks", 0)
+                // SharedPreferences stores doubles as long bits; home_widget saves them as strings
+                val nextClass = widgetData.getString("att_next_class", "No class") ?: "No class"
+                val nextTime = widgetData.getString("att_next_time", "--:--") ?: "--:--"
+                val currentPct = parseDouble(widgetData, "att_current_pct", 75.0)
+                val ifAttendPct = parseDouble(widgetData, "att_if_attend_pct", 76.0)
+                val ifSkipPct = parseDouble(widgetData, "att_if_skip_pct", 74.0)
+                val risk = widgetData.getString("att_risk", "LOW") ?: "LOW"
+                val safeBunks = parseInt(widgetData, "att_safe_bunks", 0)
 
                 // Set text views
                 setTextViewText(R.id.att_next_class, nextClass)
@@ -55,6 +55,33 @@ class AttendanceWidgetProvider : HomeWidgetProvider() {
                 setOnClickPendingIntent(R.id.btn_skip, skipIntent)
             }
             appWidgetManager.updateAppWidget(appWidgetId, views)
+        }
+    }
+
+    // home_widget saves doubles/ints as strings in SharedPreferences
+    private fun parseDouble(prefs: SharedPreferences, key: String, default: Double): Double {
+        return try {
+            val value = prefs.getString(key, null)
+            value?.toDoubleOrNull() ?: try {
+                prefs.getFloat(key, default.toFloat()).toDouble()
+            } catch (e: Exception) {
+                default
+            }
+        } catch (e: Exception) {
+            default
+        }
+    }
+
+    private fun parseInt(prefs: SharedPreferences, key: String, default: Int): Int {
+        return try {
+            val value = prefs.getString(key, null)
+            value?.toIntOrNull() ?: try {
+                prefs.getInt(key, default)
+            } catch (e: Exception) {
+                default
+            }
+        } catch (e: Exception) {
+            default
         }
     }
 }

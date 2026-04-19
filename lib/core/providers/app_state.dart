@@ -114,6 +114,7 @@ class AppState extends ChangeNotifier {
       await Future.wait([
         timetable.fetchTimetable(),
         attendance.fetchRecords(),
+        attendance.fetchSemesterDates(),
         kanban.fetchTasks(),
         focus.fetchSessions(),
         expenses.fetchTransactions(),
