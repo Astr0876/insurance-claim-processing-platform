@@ -27,42 +27,47 @@ void main() {
     test('Verify TensorFlow.js local vectorization & Airplane Mode', () async {
       // Setup
       assistantService.setMode(AssistantMode.luminaRag);
-      await assistantService.downloadLumina(); // Simulate loading model
-      
-      const textbookContent = 'The primary goal of a compiler is to translate source code to machine code.';
+
+      const textbookContent =
+          'The primary goal of a compiler is to translate source code to machine code.';
       await assistantService.indexDocument(textbookContent);
 
       // Execute query
-      final stream = assistantService.getAnswerStream('What is the goal of a compiler?');
+      final stream = assistantService.getAnswerStream(
+        'What is the goal of a compiler?',
+      );
       final output = await stream.join('');
 
       // Verify "Airplane Mode" / Privacy Guard
       expect(output, contains('Privacy Guard'));
       expect(output, contains('Zero Network Activity Verified'));
-      
+
       // Verify Local Vectorization
       expect(output, contains('Local Vectorization'));
       expect(output, contains('Searching offline embeddings'));
-      
-      // Verify results are from local document only
+
+      // Verify local semantic retrieval output
       expect(output, contains('translate source code to machine code'));
+      expect(output, contains('local indexed content only'));
     });
 
     test('Test Synthesis logic (not just snippets)', () async {
       assistantService.setMode(AssistantMode.luminaRag);
-      await assistantService.downloadLumina();
-      
-      const content = 'Photosynthesis is the process by which green plants use sunlight to synthesize nutrients from carbon dioxide and water.';
+
+      const content =
+          'Photosynthesis is the process by which green plants use sunlight to synthesize nutrients from carbon dioxide and water.';
       await assistantService.indexDocument(content);
 
-      final stream = assistantService.getAnswerStream('What is photosynthesis?');
+      final stream = assistantService.getAnswerStream(
+        'What is photosynthesis?',
+      );
       final output = await stream.join('');
 
       // Verify Synthesis header
       expect(output, contains('Synthesis'));
-      
+
       // Verify it synthesized an answer (not just a raw snippet list)
-      expect(output, contains('Based on your local document'));
+      expect(output, contains('Based on your local documents'));
       expect(output, contains("here's a synthesis regarding"));
     });
 
