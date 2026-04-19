@@ -13,9 +13,8 @@ import '../../features/latex/latex_preview_screen.dart';
 import '../../features/expenses/screens/expense_screen.dart';
 import '../../features/calendar/calendar_heatmap_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
-import '../../core/providers/app_state.dart';
-import 'package:provider/provider.dart';
 import '../../core/widgets/nb_card.dart';
+import '../../core/services/gemini_service.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -27,6 +26,15 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0; 
   bool _hasStarted = false;
+
+  // BOTTOM NAV ITEMS: The Core Student Journey
+  static const _navItems = [
+    (Icons.bolt_rounded,            'Pulse',        NBColors.primary),
+    (Icons.psychology_rounded,      'Deep Work',    NBColors.blue),
+    (Icons.auto_awesome_rounded,    'Second Brain', NBColors.purple),
+    (Icons.groups_rounded,          'Squad',        NBColors.warning),
+    (Icons.person_rounded,          'Profile',      NBColors.pink),
+  ];
 
   @override
   void initState() {
@@ -62,38 +70,71 @@ class _AppShellState extends State<AppShell> {
     setState(() => _currentIndex = index);
   }
 
-  void _showAIDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const LuminaAIDialog(),
-    );
-  }
-
-  // BOTTOM NAV ITEMS: The Core Student Journey
-  static const _navItems = [
-    (Icons.bolt_rounded,            'Pulse',        NBColors.primary),
-    (Icons.psychology_rounded,      'Deep Work',    NBColors.blue),
-    (Icons.auto_awesome_rounded,    'Second Brain', NBColors.purple),
-    (Icons.groups_rounded,          'Squad',        NBColors.warning),
-    (Icons.person_rounded,          'Profile',      NBColors.pink),
-  ];
-
   @override
   Widget build(BuildContext context) {
     if (!_hasStarted) {
       return LetsGoScreen(onStart: () => setState(() => _hasStarted = true));
     }
 
+    final tabItem = _navItems[_currentIndex];
+
     return Scaffold(
       backgroundColor: NBColors.bg,
       appBar: AppBar(
-        title: Text(_navItems[_currentIndex].$2.toUpperCase()),
+        title: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: tabItem.$3,
+                border: Border.all(color: NBColors.black, width: 2),
+                borderRadius: NBRadius.softAll,
+              ),
+              child: Icon(tabItem.$1, size: 14, color: NBColors.black),
+            ),
+            const SizedBox(width: 10),
+            Text(tabItem.$2.toUpperCase(), style: NBText.heading3),
+          ],
+        ),
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded),
+            icon: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                border: Border.all(color: NBColors.black, width: 2),
+                borderRadius: NBRadius.softAll,
+              ),
+              child: const Icon(Icons.menu_rounded, size: 18),
+            ),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => _showAISheet(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: NBColors.purple,
+                  border: Border.all(color: NBColors.black, width: 2),
+                  borderRadius: NBRadius.softAll,
+                  boxShadow: NBShadows.small,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded, size: 14, color: NBColors.black),
+                    const SizedBox(width: 4),
+                    Text('ASK AI', style: NBText.label.copyWith(fontSize: 9)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       drawer: _buildDrawer(),
       body: IndexedStack(
@@ -107,10 +148,21 @@ class _AppShellState extends State<AppShell> {
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: _currentIndex == 2 ? null : FloatingActionButton(
-        onPressed: () => _showAIDialog(context),
-        backgroundColor: NBColors.primary,
-        child: const Icon(Icons.smart_toy_rounded, color: NBColors.black),
+    );
+  }
+
+  void _showAISheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: NBColors.bg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+        side: BorderSide(color: NBColors.black, width: 2),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: const _LuminaAISheet(),
       ),
     );
   }
@@ -184,13 +236,15 @@ class _AppShellState extends State<AppShell> {
                 _drawerSection('Core Tools'),
                 _drawerItem(Icons.settings_input_component_rounded, 'The Engine', NBColors.primary, () => _push(const EngineScreen())),
                 _drawerItem(Icons.view_kanban_rounded, 'Kanban Board', NBColors.blue, () => _push(const KanbanScreen())),
+                _drawerItem(Icons.calendar_month_rounded, 'Stress Heatmap', NBColors.danger, () => _push(const CalendarHeatmapScreen())),
                 _drawerItem(Icons.description_rounded, 'LaTeX Workspace', NBColors.warning, () => _push(const LaTeXPreviewScreen())),
                 _drawerItem(Icons.payments_rounded, 'Expense Tracker', NBColors.pink, () => _push(const ExpenseScreen())),
-                _drawerItem(Icons.calendar_month_rounded, 'Stress Heatmap', NBColors.danger, () => _push(const CalendarHeatmapScreen())),
                 const SizedBox(height: 20),
                 _drawerSection('Settings'),
-                _drawerItem(Icons.cloud_download_rounded, 'AI Models', NBColors.purple, () {}),
-                _drawerItem(Icons.logout_rounded, 'Logout', NBColors.danger, () => Supabase.instance.client.auth.signOut()),
+                _drawerItem(Icons.logout_rounded, 'Logout', NBColors.danger, () {
+                  Supabase.instance.client.auth.signOut();
+                  Navigator.pop(context);
+                }),
               ],
             ),
           ),
@@ -253,206 +307,210 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
-class LuminaAIDialog extends StatefulWidget {
-  const LuminaAIDialog({super.key});
+// ─────────────────────────────────────────────────────────────────────
+//  Lumina AI Sheet — Bottom sheet with Gemini chat
+// ─────────────────────────────────────────────────────────────────────
+
+class _LuminaAISheet extends StatefulWidget {
+  const _LuminaAISheet();
 
   @override
-  State<LuminaAIDialog> createState() => _LuminaAIDialogState();
+  State<_LuminaAISheet> createState() => _LuminaAISheetState();
 }
 
-class _LuminaAIDialogState extends State<LuminaAIDialog> {
+class _LuminaAISheetState extends State<_LuminaAISheet> {
   final TextEditingController _controller = TextEditingController();
-  String _result = "";
+  final List<_ChatMsg> _messages = [];
   bool _isLoading = false;
-  bool _isStreaming = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _isLoading) return;
+
+    setState(() {
+      _messages.add(_ChatMsg(text, true));
+      _controller.clear();
+      _isLoading = true;
+    });
+
+    try {
+      String response = '';
+      final stream = GeminiService.instance.chatStream(text);
+      _messages.add(_ChatMsg('', false));
+
+      await for (final token in stream) {
+        if (!mounted) break;
+        response += token;
+        setState(() {
+          _messages.last = _ChatMsg(response, false);
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _messages.add(_ChatMsg('Error: $e', false));
+      });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final state = Provider.of<AppState>(context);
-    final aiModels = state.aiModels;
-
-    return Dialog(
-      backgroundColor: NBColors.bg,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-      shape: RoundedRectangleBorder(
-        borderRadius: NBRadius.softAll,
-        side: const BorderSide(color: NBColors.black, width: 2),
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            width: 40, height: 4,
+            decoration: BoxDecoration(color: NBColors.black, borderRadius: NBRadius.softAll),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
               children: [
-                Text('LUMINA AI', style: NBText.heading3),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _controller,
-              maxLines: 3,
-              style: NBText.bodySmall,
-              decoration: InputDecoration(
-                hintText: 'Ask anything...',
-                filled: true,
-                fillColor: NBColors.white,
-                border: OutlineInputBorder(
-                  borderRadius: NBRadius.softAll,
-                  borderSide: const BorderSide(color: NBColors.black, width: 2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _buildActionButton(
-                  icon: Icons.auto_awesome_rounded,
-                  label: _isStreaming ? 'STREAMING...' : 'GENERATE',
-                  color: NBColors.primary,
-                  onPressed: () async {
-                    if (_isStreaming || _controller.text.trim().isEmpty) return;
-                    setState(() {
-                      _isLoading = true;
-                      _isStreaming = true;
-                      _result = "";
-                    });
-                    
-                    try {
-                      final stream = aiModels.generateTextStream(_controller.text);
-                      await for (final token in stream) {
-                        if (!mounted) break;
-                        setState(() {
-                          _result += token;
-                          _isLoading = false;
-                        });
-                      }
-                    } finally {
-                      if (mounted) {
-                        setState(() {
-                          _isLoading = false;
-                          _isStreaming = false;
-                        });
-                      }
-                    }
-                  },
-                ),
-                const SizedBox(width: 8),
-                _buildActionButton(
-                  icon: Icons.mic_rounded,
-                  label: 'LISTEN',
-                  color: const Color(0xFF64B5F6),
-                  onPressed: () async {
-                    setState(() => _isLoading = true);
-                    final res = await aiModels.listen();
-                    _controller.text = res;
-                    setState(() => _isLoading = false);
-                  },
-                ),
-                const SizedBox(width: 8),
-                _buildActionButton(
-                  icon: Icons.volume_up_rounded,
-                  label: 'SPEAK',
-                  color: NBColors.warning,
-                  onPressed: () {
-                    aiModels.speak(_result.isEmpty ? _controller.text : _result);
-                  },
-                ),
-              ],
-            ),
-            if (_isLoading) ...[
-              const SizedBox(height: 20),
-              const Center(child: CircularProgressIndicator(color: NBColors.primary)),
-            ],
-            if (_result.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Flexible(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  width: double.infinity,
+                Container(
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: NBColors.white,
+                    color: NBColors.purple,
                     border: Border.all(color: NBColors.black, width: 2),
                     borderRadius: NBRadius.softAll,
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('RESULT:', style: NBText.label.copyWith(fontSize: 10)),
-                      const SizedBox(height: 4),
-                      Flexible(
-                        child: SingleChildScrollView(
-                          child: Text(_result, style: NBText.bodySmall),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Result saved locally.')),
-                              );
-                            },
-                            child: Text(
-                              'DOWNLOAD RESULT',
-                              style: NBText.bodySmall.copyWith(
-                                color: NBColors.primary,
-                                fontWeight: FontWeight.bold,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          if (_isStreaming)
-                            const Icon(Icons.sync_rounded, size: 16, color: NBColors.primary),
-                        ],
-                      ),
-                    ],
+                  child: const Icon(Icons.auto_awesome_rounded, size: 16, color: NBColors.black),
+                ),
+                const SizedBox(width: 10),
+                Text('LUMINA AI', style: NBText.heading3),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () {
+                    GeminiService.instance.resetChat();
+                    setState(() => _messages.clear());
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: NBColors.black, width: 1.5),
+                      borderRadius: NBRadius.softAll,
+                    ),
+                    child: Text('CLEAR', style: NBText.label.copyWith(fontSize: 8)),
                   ),
                 ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
+              ],
+            ),
+          ),
+          const Divider(color: NBColors.black, thickness: 1, height: 16),
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onPressed,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: color,
-            border: Border.all(color: NBColors.black, width: 2),
-            borderRadius: NBRadius.softAll,
-            boxShadow: NBShadows.small,
+          // Messages
+          Expanded(
+            child: _messages.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('💡', style: TextStyle(fontSize: 32)),
+                        const SizedBox(height: 8),
+                        Text('Ask me anything about your studies!', style: NBText.bodySmall),
+                        const SizedBox(height: 4),
+                        Text('Attendance advice, study tips, note summaries...', 
+                            style: NBText.bodySmall.copyWith(color: const Color(0xFF888888), fontSize: 11)),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, i) {
+                      final msg = _messages[i];
+                      return Align(
+                        alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(10),
+                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                          decoration: BoxDecoration(
+                            color: msg.isUser ? NBColors.primary : NBColors.white,
+                            border: Border.all(color: NBColors.black, width: 2),
+                            borderRadius: NBRadius.softAll,
+                            boxShadow: NBShadows.small,
+                          ),
+                          child: Text(
+                            msg.text.isEmpty ? '...' : msg.text,
+                            style: NBText.bodySmall,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 20, color: NBColors.black),
-              const SizedBox(height: 4),
-              Text(label, style: NBText.label.copyWith(fontSize: 8)),
-            ],
+
+          // Input
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: NBColors.black, width: 1)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: NBColors.white,
+                      border: Border.all(color: NBColors.black, width: 2),
+                      borderRadius: NBRadius.softAll,
+                    ),
+                    child: TextField(
+                      controller: _controller,
+                      style: NBText.bodySmall,
+                      onSubmitted: (_) => _send(),
+                      decoration: const InputDecoration(
+                        hintText: 'Ask Lumina anything...',
+                        hintStyle: TextStyle(color: Color(0xFF888888)),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _isLoading ? null : _send,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _isLoading ? NBColors.black : NBColors.primary,
+                      border: Border.all(color: NBColors.black, width: 2),
+                      borderRadius: NBRadius.softAll,
+                      boxShadow: NBShadows.small,
+                    ),
+                    child: Icon(
+                      _isLoading ? Icons.hourglass_top_rounded : Icons.send_rounded,
+                      size: 20,
+                      color: _isLoading ? NBColors.white : NBColors.black,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
+}
+
+class _ChatMsg {
+  final String text;
+  final bool isUser;
+  const _ChatMsg(this.text, this.isUser);
 }

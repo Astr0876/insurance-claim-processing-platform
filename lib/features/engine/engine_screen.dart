@@ -33,33 +33,21 @@ class _EngineScreenState extends State<EngineScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: NBColors.bg,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.settings_input_component_rounded, size: 20),
+            const SizedBox(width: 8),
+            Text('THE ENGINE', style: NBText.heading3),
+          ],
+        ),
+      ),
       body: Column(
         children: [
-          // ── Header ────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            decoration: const BoxDecoration(
-              color: NBColors.white,
-              border: Border(bottom: BorderSide(color: NBColors.black, width: 2)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.settings_input_component_rounded, color: NBColors.black),
-                    const SizedBox(width: 12),
-                    Text('THE ENGINE', style: NBText.heading2),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Automated scheduling, attendance, and bunk optimization.',
-                  style: NBText.bodySmall,
-                ),
-              ],
-            ),
-          ),
 
           // ── Tab Bar ──────────────────────────────────────────────
           Container(

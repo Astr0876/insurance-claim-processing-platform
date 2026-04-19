@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../utils/constants.dart';
+import 'gemini_service.dart';
 import 'gradio_service.dart';
 
 enum TimetableImportType { pdf, image }
@@ -443,41 +445,179 @@ class TimetableService extends ChangeNotifier {
 
       String rawText = '';
       
-      // --- ON-DEVICE EXTRACTION (Lumina Mandate: FULLY OFFLINE) ---
+      // STEP 1: Extract raw text from the file
       if (type == TimetableImportType.pdf) {
-        debugPrint('LUMINA: Attempting On-Device PDF Extraction...');
+        debugPrint('LUMINA: Extracting text from PDF...');
         rawText = await _extractTextFromPdf(file);
       } else {
-        debugPrint('LUMINA: Attempting On-Device Image OCR...');
+        debugPrint('LUMINA: Extracting text from image via OCR...');
         rawText = await _extractTextFromImage(file);
       }
 
-      // --- SEAMLESS FALLBACK ---
-      if (rawText.isEmpty) {
-        debugPrint('LUMINA: On-device extraction failed/empty, falling back to Gradio seamlessly...');
-        return _importViaGradio(filePath, type);
+      if (rawText.trim().isEmpty) {
+        return TimetableImportResult.failure(
+          filePath: filePath,
+          sourceType: type,
+          message: 'Could not extract any text from this file. Try a clearer image or a text-based PDF.',
+        );
       }
 
       _lastRawExtractedText = rawText;
+      debugPrint('LUMINA: Extracted ${rawText.length} chars. Sending to AI for parsing...');
 
-      final parsed = parser.parseRawText(rawText);
-      // If parsing fails on the on-device text, also try the backend
-      if (parsed.slots.isEmpty) {
-        debugPrint('LUMINA: Parsing on-device text failed, falling back to Gradio seamlessly...');
-        return _importViaGradio(filePath, type);
+      // STEP 2: Use Gemini AI to parse the raw text into structured timetable
+      final aiSlots = await _parseWithGemini(rawText);
+      if (aiSlots.isNotEmpty) {
+        debugPrint('LUMINA: Gemini parsed ${aiSlots.length} class slots successfully.');
+        return TimetableImportResult.success(
+          filePath: filePath,
+          sourceType: type,
+          rawText: rawText,
+          slots: aiSlots,
+          issues: [],
+        );
       }
 
-      return TimetableImportResult.success(
+      // STEP 3: Fall back to regex parser
+      debugPrint('LUMINA: Gemini parsing failed, trying regex parser...');
+      final parsed = parser.parseRawText(rawText);
+      
+      // Check if regex gave good results (not all "Untitled Class")
+      final goodSlots = parsed.slots.where((s) => s.subject != 'Untitled Class').toList();
+      if (goodSlots.isNotEmpty) {
+        return TimetableImportResult.success(
+          filePath: filePath,
+          sourceType: type,
+          rawText: rawText,
+          slots: parsed.slots,
+          issues: parsed.issues,
+        );
+      }
+
+      // STEP 4: If we got time slots but no subjects, still return them 
+      // but with issues so user can edit
+      if (parsed.slots.isNotEmpty) {
+        return TimetableImportResult.success(
+          filePath: filePath,
+          sourceType: type,
+          rawText: rawText,
+          slots: parsed.slots,
+          issues: [
+            const ParseIssue(
+              lineNumber: 0,
+              message: 'Subject names could not be detected. Tap each class to edit.',
+              rawLine: '',
+            ),
+            ...parsed.issues,
+          ],
+        );
+      }
+
+      return TimetableImportResult.failure(
         filePath: filePath,
         sourceType: type,
+        message: 'Could not detect any timetable entries. Make sure the file contains a class schedule with days and times.',
         rawText: rawText,
-        slots: parsed.slots,
         issues: parsed.issues,
       );
     } catch (e) {
-      debugPrint('LUMINA: On-device critical error, falling back to Gradio: $e');
-      return _importViaGradio(filePath, type);
+      debugPrint('LUMINA: Import error: $e');
+      return TimetableImportResult.failure(
+        filePath: filePath,
+        sourceType: type,
+        message: 'Error processing file: ${e.toString().length > 80 ? e.toString().substring(0, 80) : e}',
+      );
     }
+  }
+
+  /// Use Gemini AI to intelligently parse raw timetable text
+  Future<List<ParsedClassSlot>> _parseWithGemini(String rawText) async {
+    try {
+      final gemini = GeminiService.instance;
+      if (!gemini.isInitialized) return [];
+
+      // Limit text length to avoid token limits
+      final truncated = rawText.length > 4000 ? rawText.substring(0, 4000) : rawText;
+
+      final prompt = '''Parse this college timetable text into a JSON array. Each entry should have:
+- "day": weekday name (Monday/Tuesday/Wednesday/Thursday/Friday)  
+- "start": start time in 24h format (HH:MM)
+- "end": end time in 24h format (HH:MM)
+- "subject": subject/course name
+- "room": room/lab number (use "TBA" if not found)
+
+Return ONLY a valid JSON array, no other text. Example:
+[{"day":"Monday","start":"09:00","end":"10:00","subject":"Data Structures","room":"LH-301"}]
+
+Here is the timetable text:
+$truncated''';
+
+      final response = await gemini.generateText(prompt);
+      
+      // Extract JSON from response
+      final jsonStr = _extractJson(response);
+      if (jsonStr == null) return [];
+
+      final List<dynamic> parsed = jsonDecode(jsonStr);
+      final slots = <ParsedClassSlot>[];
+
+      for (final entry in parsed) {
+        if (entry is! Map<String, dynamic>) continue;
+        
+        final day = entry['day'] as String? ?? '';
+        final start = entry['start'] as String? ?? '';
+        final end = entry['end'] as String? ?? '';
+        final subject = entry['subject'] as String? ?? 'Untitled Class';
+        final room = entry['room'] as String? ?? 'TBA';
+
+        if (day.isEmpty || start.isEmpty || end.isEmpty) continue;
+
+        // Normalize day name
+        final normalizedDay = _normalizeDayName(day);
+        if (normalizedDay == null) continue;
+
+        final duration = parser._minutesBetween(start, end) ?? 60;
+
+        slots.add(ParsedClassSlot(
+          day: normalizedDay,
+          startTime24: start,
+          endTime24: end,
+          subject: subject,
+          room: room,
+          durationMinutes: duration <= 0 ? 60 : duration,
+          confidence: 0.85,
+          sourceLine: 'AI parsed',
+        ));
+      }
+
+      return slots;
+    } catch (e) {
+      debugPrint('Gemini parse error: $e');
+      return [];
+    }
+  }
+
+  String? _extractJson(String text) {
+    // Try to find JSON array in the response
+    final bracketStart = text.indexOf('[');
+    final bracketEnd = text.lastIndexOf(']');
+    if (bracketStart >= 0 && bracketEnd > bracketStart) {
+      return text.substring(bracketStart, bracketEnd + 1);
+    }
+    return null;
+  }
+
+  String? _normalizeDayName(String day) {
+    final lower = day.toLowerCase().trim();
+    const map = {
+      'monday': 'Monday', 'mon': 'Monday',
+      'tuesday': 'Tuesday', 'tue': 'Tuesday', 'tues': 'Tuesday',
+      'wednesday': 'Wednesday', 'wed': 'Wednesday',
+      'thursday': 'Thursday', 'thu': 'Thursday', 'thur': 'Thursday', 'thurs': 'Thursday',
+      'friday': 'Friday', 'fri': 'Friday',
+      'saturday': 'Saturday', 'sat': 'Saturday',
+    };
+    return map[lower];
   }
 
   Future<String> _extractTextFromPdf(File file) async {

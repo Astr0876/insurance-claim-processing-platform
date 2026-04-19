@@ -51,7 +51,22 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     final appState = context.watch<AppState>();
     final controller = appState.expenses;
 
-    return Column(
+    return Scaffold(
+      backgroundColor: NBColors.bg,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.payments_rounded, size: 20),
+            const SizedBox(width: 8),
+            Text('EXPENSES', style: NBText.heading3),
+          ],
+        ),
+      ),
+      body: Column(
       children: [
         // ── Info Bar ────────────────────────────────────────────────
         Container(
@@ -147,6 +162,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
           ),
         ),
       ],
+    ),
     );
   }
 }

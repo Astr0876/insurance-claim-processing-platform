@@ -41,7 +41,22 @@ class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
     final latex = appState.latex;
     final report = latex.currentReport;
 
-    return DefaultTabController(
+    return Scaffold(
+      backgroundColor: NBColors.bg,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.description_rounded, size: 20),
+            const SizedBox(width: 8),
+            Text('LATEX WORKSPACE', style: NBText.heading3),
+          ],
+        ),
+      ),
+      body: DefaultTabController(
       length: 2,
       child: Column(
         children: [
@@ -74,6 +89,7 @@ class _LaTeXPreviewScreenState extends State<LaTeXPreviewScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 

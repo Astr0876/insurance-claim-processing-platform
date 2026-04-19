@@ -62,21 +62,21 @@ class _TimetableScreenState extends State<TimetableScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text('WEEKLY SCHEDULE', style: NBText.heading1),
-                        ),
-                        _buildImportButton(state),
-                        const SizedBox(width: 8),
-                        _buildAddButton(state),
-                      ],
-                    ),
+                    Text('WEEKLY SCHEDULE', style: NBText.heading2),
+                    const SizedBox(height: 4),
                     Text(
                       'Week at a glance',
                       style: NBText.body.copyWith(
                         color: const Color(0xFF666666),
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _buildImportButton(state),
+                        const SizedBox(width: 8),
+                        _buildAddButton(state),
+                      ],
                     ),
                   ],
                 ),

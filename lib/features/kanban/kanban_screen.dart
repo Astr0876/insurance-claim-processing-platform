@@ -49,7 +49,22 @@ class _KanbanScreenState extends State<KanbanScreen> {
       return groups.firstWhere((g) => g.id == idStr, orElse: () => groups[0]);
     }
 
-    return Column(
+    return Scaffold(
+      backgroundColor: NBColors.bg,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.view_kanban_rounded, size: 20),
+            const SizedBox(width: 8),
+            Text('KANBAN BOARD', style: NBText.heading3),
+          ],
+        ),
+      ),
+      body: Column(
       children: [
         // ── Info Bar ────────────────────────────────────────────────
         Container(
@@ -187,6 +202,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
           ),
         ),
       ],
+    ),
     );
   }
 
