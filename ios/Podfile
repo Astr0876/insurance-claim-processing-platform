@@ -25,6 +25,8 @@ end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
 
+ENV['RUNANYWHERE_COMMONS_URL'] = 'https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v0.16.0/RACommons-ios-v0.16.0.zip'
+
 flutter_ios_podfile_setup
 
 target 'Runner' do
@@ -37,16 +39,12 @@ target 'Runner' do
 end
 
 post_install do |installer|
-  installer.pods_project.targets.each do |target|
-    flutter_additional_ios_build_settings(target)
-    target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-      # Required for microphone and speech recognition permissions
-      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
-        '$(inherited)',
-        'PERMISSION_MICROPHONE=1',
-        'PERMISSION_SPEECH_RECOGNIZER=1',
-      ]
+  installer.generated_projects.each do |project|
+    project.targets.each do |target|
+      flutter_additional_ios_build_settings(target)
+    end
+    project.build_configurations.each do |config|
+      config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
     end
   end
 end

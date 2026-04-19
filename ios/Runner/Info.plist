@@ -49,6 +49,10 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library to pick images for text recognition.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to recognize text from images.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs microphone access for speech recognition and voice commands.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
