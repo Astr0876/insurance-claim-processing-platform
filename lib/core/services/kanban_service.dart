@@ -7,6 +7,18 @@ enum KanbanStatus { todo, doing, done }
 
 extension KanbanStatusExtension on KanbanStatus {
   String toShortString() => toString().split('.').last;
+  
+  String toDisplayString() {
+    switch (this) {
+      case KanbanStatus.todo:
+        return 'What I Want to Do';
+      case KanbanStatus.doing:
+        return 'What I am Doing';
+      case KanbanStatus.done:
+        return 'Done';
+    }
+  }
+
   static KanbanStatus fromString(String status) {
     return KanbanStatus.values.firstWhere(
       (e) => e.toShortString() == status,

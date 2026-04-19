@@ -552,20 +552,21 @@ class _TimetableScreenState extends State<TimetableScreen>
         return;
       }
 
-      final reviewed = await Navigator.of(context).push<List<ParsedClassSlot>>(
+      final resultData = await Navigator.of(context).push<ReviewResult>(
         MaterialPageRoute(
           builder: (_) => TimetableImportReviewScreen(
             initialSlots: importResult.slots,
             issues: importResult.issues,
             rawText: importResult.rawText,
+            fullJson: importResult.fullJson,
           ),
         ),
       );
 
-      if (!mounted || reviewed == null || reviewed.isEmpty) return;
-      state.applyImportedTimetable(reviewed);
+      if (!mounted || resultData == null || resultData.slots.isEmpty) return;
+      state.applyImportedTimetable(resultData.slots, fullJson: resultData.fullJson);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Imported ${reviewed.length} class slots.')),
+        SnackBar(content: Text('Imported ${resultData.slots.length} class slots.')),
       );
     } finally {
       if (mounted) setState(() => _isImporting = false);

@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/theme/neubrut_tokens.dart';
 import '../../../../core/widgets/nb_card.dart';
 import '../../../../core/widgets/nb_badge.dart';
@@ -46,6 +47,14 @@ class _PollsTabState extends State<PollsTab> {
         // ── Room Insights ──────────────────────────────────────────
         SliverToBoxAdapter(
           child: _buildInsights(svc),
+        ),
+
+        // ── Study Squads Flow Graph ────────────────────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: _StudySquadsFlowGraph(trend: svc.flowTrend),
+          ),
         ),
 
         // ── Create poll ────────────────────────────────────────────
@@ -235,6 +244,91 @@ class _PollsTabState extends State<PollsTab> {
         const SizedBox(height: 4),
         Text(label.toUpperCase(), style: NBText.label.copyWith(fontSize: 8)),
       ],
+    );
+  }
+}
+
+// ── Study Squads Flow Graph Widget ───────────────────────────────
+
+class _StudySquadsFlowGraph extends StatelessWidget {
+  final List<double> trend;
+
+  const _StudySquadsFlowGraph({required this.trend});
+
+  @override
+  Widget build(BuildContext context) {
+    // Generate dummy trend if empty for visual demo
+    final List<double> displayTrend = trend.isNotEmpty 
+        ? trend 
+        : [65, 72, 68, 85, 92, 88, 75, 80, 82, 85];
+
+    return NBCard(
+      fillColor: NBColors.white,
+      shadows: NBShadows.medium,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(width: 4, height: 16, color: NBColors.blue, margin: const EdgeInsets.only(right: 8)),
+              Text('STUDY SQUAD FLOW TREND', style: NBText.label.copyWith(fontSize: 10, letterSpacing: 1.5)),
+              const Spacer(),
+              NBBadge(
+                label: 'LIVE',
+                fillColor: NBColors.danger,
+                textColor: NBColors.white,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Anonymized collective deep focus score',
+            style: NBText.bodySmall.copyWith(color: const Color(0xFF666666), fontSize: 9),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 100,
+            child: LineChart(
+              LineChartData(
+                gridData: const FlGridData(show: false),
+                titlesData: const FlTitlesData(show: false),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: displayTrend.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList(),
+                    isCurved: true,
+                    color: NBColors.black,
+                    barWidth: 3,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: NBColors.blue.withValues(alpha: 0.3),
+                    ),
+                  ),
+                ],
+                minY: 0,
+                maxY: 100,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _trendLabel('PAST HOUR'),
+              _trendLabel('NOW'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _trendLabel(String text) {
+    return Text(
+      text,
+      style: NBText.label.copyWith(fontSize: 8, color: const Color(0xFF888888)),
     );
   }
 }

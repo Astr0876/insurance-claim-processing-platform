@@ -52,6 +52,11 @@ dependencies:
   sqflite: ^2.4.2
   path: ^1.9.1
   connectivity_plus: ^7.1.1
+  runanywhere: ^0.16.0
+  runanywhere_llamacpp: ^0.16.0
+  runanywhere_onnx: ^0.16.0
+  record: ^5.2.1
+  audioplayers: ^6.1.1
 
 dev_dependencies:
   flutter_test:

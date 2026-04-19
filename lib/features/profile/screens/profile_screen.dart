@@ -102,7 +102,18 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                   if (status.isDownloaded)
-                    const Icon(Icons.check_circle_rounded, color: NBColors.safe)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!status.isLoaded)
+                          IconButton(
+                            icon: const Icon(Icons.play_circle_outline_rounded, color: NBColors.primary),
+                            onPressed: () => state.aiModels.loadModel(type),
+                            tooltip: 'Load into memory',
+                          ),
+                        const Icon(Icons.check_circle_rounded, color: NBColors.safe),
+                      ],
+                    )
                   else if (status.isDownloading)
                     SizedBox(
                       width: 24,

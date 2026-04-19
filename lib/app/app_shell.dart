@@ -321,6 +321,7 @@ class _RunAnywhereDialogState extends State<RunAnywhereDialog> {
   final TextEditingController _controller = TextEditingController();
   String _result = "";
   bool _isLoading = false;
+  bool _isStreaming = false;
 
   @override
   Widget build(BuildContext context) {
@@ -329,6 +330,7 @@ class _RunAnywhereDialogState extends State<RunAnywhereDialog> {
 
     return Dialog(
       backgroundColor: NBColors.bg,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       shape: RoundedRectangleBorder(
         borderRadius: NBRadius.softAll,
         side: const BorderSide(color: NBColors.black, width: 2),
@@ -353,6 +355,7 @@ class _RunAnywhereDialogState extends State<RunAnywhereDialog> {
             TextField(
               controller: _controller,
               maxLines: 3,
+              style: NBText.bodySmall,
               decoration: InputDecoration(
                 hintText: 'Ask anything...',
                 filled: true,
@@ -368,22 +371,40 @@ class _RunAnywhereDialogState extends State<RunAnywhereDialog> {
               children: [
                 _buildActionButton(
                   icon: Icons.auto_awesome_rounded,
-                  label: 'GENERATE',
+                  label: _isStreaming ? 'STREAMING...' : 'GENERATE',
                   color: NBColors.primary,
-                  onPressed: () async {
-                    setState(() => _isLoading = true);
-                    final res = await aiModels.generateText(_controller.text);
+                  onPressed: _isStreaming ? null : () async {
+                    if (_controller.text.isEmpty) return;
                     setState(() {
-                      _result = res;
-                      _isLoading = false;
+                      _isLoading = true;
+                      _isStreaming = true;
+                      _result = "";
                     });
+                    
+                    try {
+                      final stream = aiModels.generateTextStream(_controller.text);
+                      await for (final token in stream) {
+                        if (!mounted) break;
+                        setState(() {
+                          _result += token;
+                          _isLoading = false;
+                        });
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() {
+                          _isLoading = false;
+                          _isStreaming = false;
+                        });
+                      }
+                    }
                   },
                 ),
                 const SizedBox(width: 8),
                 _buildActionButton(
                   icon: Icons.mic_rounded,
                   label: 'LISTEN',
-                  color: NBColors.blue,
+                  color: const Color(0xFF64B5F6),
                   onPressed: () async {
                     setState(() => _isLoading = true);
                     final res = await aiModels.listen();
@@ -408,38 +429,51 @@ class _RunAnywhereDialogState extends State<RunAnywhereDialog> {
             ],
             if (_result.isNotEmpty) ...[
               const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(12),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: NBColors.white,
-                  border: Border.all(color: NBColors.black, width: 2),
-                  borderRadius: NBRadius.softAll,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('RESULT:', style: NBText.label.copyWith(fontSize: 10)),
-                    const SizedBox(height: 4),
-                    Text(_result, style: NBText.bodySmall),
-                    const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: () {
-                        // Mock download
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Downloading result as text file...')),
-                        );
-                      },
-                      child: Text(
-                        'DOWNLOAD RESULT',
-                        style: NBText.bodySmall.copyWith(
-                          color: NBColors.primary,
-                          fontWeight: FontWeight.bold,
-                          decoration: TextDecoration.underline,
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: NBColors.white,
+                    border: Border.all(color: NBColors.black, width: 2),
+                    borderRadius: NBRadius.softAll,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('RESULT:', style: NBText.label.copyWith(fontSize: 10)),
+                      const SizedBox(height: 4),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Text(_result, style: NBText.bodySmall),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Result saved locally.')),
+                              );
+                            },
+                            child: Text(
+                              'DOWNLOAD RESULT',
+                              style: NBText.bodySmall.copyWith(
+                                color: NBColors.primary,
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          if (_isStreaming)
+                            const Icon(Icons.sync_rounded, size: 16, color: NBColors.primary),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

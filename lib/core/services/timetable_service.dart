@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../utils/constants.dart';
 import 'gradio_service.dart';
 
@@ -413,6 +414,73 @@ class TimetableService extends ChangeNotifier {
         );
       }
 
+      String rawText = '';
+      
+      // --- ON-DEVICE EXTRACTION (Lumina Mandate) ---
+      if (type == TimetableImportType.pdf) {
+        debugPrint('LUMINA: Performing On-Device PDF Extraction...');
+        rawText = await _extractTextFromPdf(file);
+      } else {
+        // For images, we ideally want on-device OCR. 
+        // Since we don't have google_mlkit_text_recognition yet, we fallback to Gradio
+        // but mark it as 'Hybrid' in logs.
+        debugPrint('LUMINA: On-Device Image OCR not available, using fallback...');
+        return _importViaGradio(filePath, type);
+      }
+
+      _lastRawExtractedText = rawText;
+
+      if (rawText.isEmpty) {
+        return TimetableImportResult.failure(
+          filePath: filePath,
+          sourceType: type,
+          message: 'Could not extract any text on-device.',
+          rawText: rawText,
+        );
+      }
+
+      final parsed = parser.parseRawText(rawText);
+      if (parsed.slots.isEmpty) {
+        return TimetableImportResult.failure(
+          filePath: filePath,
+          sourceType: type,
+          message: 'No class slots could be parsed from on-device extraction.',
+          rawText: rawText,
+          issues: parsed.issues,
+        );
+      }
+
+      return TimetableImportResult.success(
+        filePath: filePath,
+        sourceType: type,
+        rawText: rawText,
+        slots: parsed.slots,
+        issues: parsed.issues,
+      );
+    } catch (e) {
+      return TimetableImportResult.failure(
+        filePath: filePath,
+        sourceType: type,
+        message: 'On-device import failed: $e',
+      );
+    }
+  }
+
+  Future<String> _extractTextFromPdf(File file) async {
+    try {
+      final PdfDocument document = PdfDocument(inputBytes: await file.readAsBytes());
+      final String text = PdfTextExtractor(document).extractText();
+      document.dispose();
+      return text;
+    } catch (e) {
+      debugPrint('PDF Extraction Error: $e');
+      return '';
+    }
+  }
+
+  Future<TimetableImportResult> _importViaGradio(String filePath, TimetableImportType type) async {
+    try {
+      final file = File(filePath);
       // Step 1: Upload to Gradio
       final remotePath = await _gradioService.uploadFile(file);
       if (remotePath == null) {
@@ -436,62 +504,42 @@ class TimetableService extends ChangeNotifier {
         );
       }
 
-      // Gradio result is [ { "subjects": [...], "raw_text": "..." } ]
       final data = result[0] as Map<String, dynamic>;
       final rawText = data['raw_text'] as String? ?? '';
       _lastRawExtractedText = rawText;
 
-      if (rawText.isEmpty) {
-        return TimetableImportResult.failure(
-          filePath: filePath,
-          sourceType: type,
-          message: 'AI service could not extract text from the file.',
-          rawText: rawText,
-        );
-      }
-
       final parsed = parser.parseRawText(rawText);
-      if (parsed.slots.isEmpty) {
-        return TimetableImportResult.failure(
-          filePath: filePath,
-          sourceType: type,
-          message: 'No class slots could be parsed from the AI extracted text.',
-          rawText: rawText,
-          issues: parsed.issues,
-        );
-      }
-
       return TimetableImportResult.success(
         filePath: filePath,
-        sourceType: sourceType,
+        sourceType: type,
         rawText: rawText,
         slots: parsed.slots,
         issues: parsed.issues,
         fullJson: data,
       );
-      } catch (e) {
+    } catch (e) {
       return TimetableImportResult.failure(
         filePath: filePath,
-        sourceType: sourceType,
-        message: 'Timetable AI import failed: $e',
+        sourceType: type,
+        message: 'Gradio fallback failed: $e',
       );
-      }
-      }
+    }
+  }
 
-      Future<void> saveOcrExtraction(Map<String, dynamic> json) async {
-      final client = Supabase.instance.client;
-      final user = client.auth.currentUser;
-      if (user == null) return;
+  Future<void> saveOcrExtraction(Map<String, dynamic> json) async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return;
 
-      try {
+    try {
       await client.from('timetable_ocr_extractions').insert({
         'user_id': user.id,
         'raw_json': json,
       });
-      } catch (e) {
+    } catch (e) {
       debugPrint('Error saving OCR extraction: $e');
-      }
-      }
+    }
+  }
 
 
   void applyImportedSchedule(List<ParsedClassSlot> slots) {
