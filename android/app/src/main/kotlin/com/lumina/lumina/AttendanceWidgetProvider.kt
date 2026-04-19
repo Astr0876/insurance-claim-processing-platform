@@ -3,6 +3,7 @@ package com.lumina.lumina
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
 import android.widget.RemoteViews
 import android.app.PendingIntent
 import android.content.Intent
