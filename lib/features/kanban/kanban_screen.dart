@@ -1,54 +1,63 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:kanban_board/kanban_board.dart';
+
 import '../../core/providers/app_state.dart';
 import '../../core/services/kanban_service.dart';
 import '../../core/theme/neubrut_tokens.dart';
-import '../../core/widgets/nb_card.dart';
 import '../../core/widgets/nb_button.dart';
+import '../../core/widgets/nb_card.dart';
+import 'board_detail_screen.dart';
 
 class KanbanScreen extends StatefulWidget {
-  const KanbanScreen({super.key});
+  const KanbanScreen({super.key, this.kanbanService});
+
+  final KanbanService? kanbanService;
 
   @override
   State<KanbanScreen> createState() => _KanbanScreenState();
 }
 
 class _KanbanScreenState extends State<KanbanScreen> {
-  final KanbanBoardController _controller = KanbanBoardController();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final kanban = _readKanban(context);
+      if (kanban.boards.isEmpty) {
+        kanban.fetchBoards();
+      }
+    });
+  }
+
+  KanbanService _readKanban(BuildContext context) {
+    if (widget.kanbanService != null) return widget.kanbanService!;
+
+    try {
+      return Provider.of<AppState>(context, listen: false).kanban;
+    } catch (_) {
+      return Provider.of<KanbanService>(context, listen: false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final appState = context.watch<AppState>();
-    final kanban = appState.kanban;
-
-    final List<KanbanBoardGroup<String, KanbanTask>> groups = [
-      KanbanBoardGroup(
-        id: 'todo',
-        name: 'WHAT I WANT TO DO',
-        items: kanban.todoTasks,
-      ),
-      KanbanBoardGroup(
-        id: 'doing',
-        name: 'WHAT I AM DOING',
-        items: kanban.doingTasks,
-      ),
-      KanbanBoardGroup(
-        id: 'done',
-        name: 'COMPLETED',
-        items: kanban.doneTasks,
-      ),
-    ];
-
-    KanbanBoardGroup<String, KanbanTask> findGroup(dynamic id) {
-      if (id is int) {
-        return groups[id];
-      }
-      final idStr = id.toString();
-      return groups.firstWhere((g) => g.id == idStr, orElse: () => groups[0]);
+    if (widget.kanbanService != null) {
+      return AnimatedBuilder(
+        animation: widget.kanbanService!,
+        builder: (context, _) => _buildHub(context, widget.kanbanService!),
+      );
     }
 
+    try {
+      final kanban = context.watch<AppState>().kanban;
+      return _buildHub(context, kanban);
+    } catch (_) {
+      final kanban = context.watch<KanbanService>();
+      return _buildHub(context, kanban);
+    }
+  }
+
+  Widget _buildHub(BuildContext context, KanbanService kanban) {
     return Scaffold(
       backgroundColor: NBColors.bg,
       appBar: AppBar(
@@ -58,285 +67,351 @@ class _KanbanScreenState extends State<KanbanScreen> {
         ),
         title: Row(
           children: [
-            const Icon(Icons.view_kanban_rounded, size: 20),
+            const Icon(Icons.grid_view_rounded, size: 20),
             const SizedBox(width: 8),
-            Text('KANBAN BOARD', style: NBText.heading3),
+            Text('KANBAN HUB', style: NBText.heading3),
           ],
         ),
       ),
       body: Column(
-      children: [
-        // ── Info Bar ────────────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: const BoxDecoration(
-            color: NBColors.white,
-            border: Border(
-              bottom: BorderSide(color: NBColors.black, width: 2),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(NBSpacing.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'MULTI-BOARD WORKSPACE',
+                    style: NBText.label.copyWith(fontSize: 11),
+                  ),
+                ),
+                NBButton(
+                  label: 'Filter',
+                  fillColor: NBColors.white,
+                  onTap: () {},
+                ),
+              ],
             ),
           ),
-          child: Row(
-            children: [
-              const Icon(Icons.view_kanban_outlined, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                'TEAM PROGRESS ENGINE',
-                style: NBText.label.copyWith(fontSize: 10),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => _showAddTaskDialog(context, kanban),
-                child: Row(
-                  children: [
-                    const Icon(Icons.add_box_rounded, size: 18),
-                    const SizedBox(width: 4),
-                    Text('ADD TASK', style: NBText.label.copyWith(fontSize: 10)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: KanbanBoard(
-            controller: _controller,
-            groups: groups,
-            onGroupItemMove: (oldGroupId, oldItemIndex, newGroupId, newItemIndex) {
-              final String taskId;
-              final KanbanStatus newStatus;
-
-              final oldGroup = findGroup(oldGroupId);
-              taskId = oldGroup.items[oldItemIndex!].taskId;
-
-              if (newGroupId is int) {
-                newStatus = _statusFromGroupIndex(newGroupId);
-              } else {
-                newStatus = _statusFromGroupId(newGroupId.toString());
-              }
-
-              // Trigger Haptics
-              HapticFeedback.mediumImpact();
-
-              // Celebration Vibe
-              if (newStatus == KanbanStatus.done) {
-                HapticFeedback.heavyImpact();
-                _showCompletionCelebration(context, taskId);
-              }
-
-              kanban.updateTaskStatus(taskId, newStatus);
-            },
-            groupHeaderBuilder: (context, groupId) {
-              final group = findGroup(groupId);
-              
-              return Padding(
-                padding: const EdgeInsets.all(NBSpacing.md),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _colorForStatus(group.id),
-                    border: Border.all(color: NBColors.black, width: 2),
-                    borderRadius: NBRadius.softAll,
-                    boxShadow: NBShadows.small,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          group.name.toUpperCase(),
-                          style: NBText.label.copyWith(fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: NBColors.white,
-                          border: Border.all(color: NBColors.black, width: 1.5),
-                          borderRadius: NBRadius.softAll,
-                        ),
-                        child: Text(
-                          group.items.length.toString(),
-                          style: NBText.monoSmall.copyWith(fontSize: 10),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-            groupItemBuilder: (context, groupId, itemIndex) {
-              final group = findGroup(groupId);
-              final task = group.items[itemIndex];
-              
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: NBSpacing.md, vertical: NBSpacing.xs),
-                child: NBCard(
-                  padding: const EdgeInsets.all(NBSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              task.title,
-                              style: NBText.heading3.copyWith(fontSize: 16),
+          Expanded(
+            child: kanban.isLoading && kanban.boards.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(
+                      NBSpacing.md,
+                      0,
+                      NBSpacing.md,
+                      NBSpacing.xl,
+                    ),
+                    itemCount: kanban.boards.length,
+                    separatorBuilder: (_, index) =>
+                        const SizedBox(height: NBSpacing.md),
+                    itemBuilder: (context, index) {
+                      final board = kanban.boards[index];
+                      return NBCard(
+                        key: Key('board-card-${board.id}'),
+                        onTap: () async {
+                          await kanban.selectBoard(board.id);
+                          if (!context.mounted) return;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BoardDetailScreen(
+                                boardId: board.id,
+                                kanbanService: kanban,
+                              ),
                             ),
-                          ),
-                          _buildAssigneeBadge(task.assigneeAvatar, task.assignee),
-                        ],
-                      ),
-                      const SizedBox(height: NBSpacing.xs),
-                      Text(
-                        task.description,
-                        style: NBText.bodySmall.copyWith(color: Colors.black54),
-                      ),
-                    ],
+                          );
+                        },
+                        fillColor: board.isShared
+                            ? NBColors.purple
+                            : NBColors.white,
+                        shadows: NBShadows.small,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    board.name,
+                                    style: NBText.heading3.copyWith(
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: board.isShared
+                                        ? NBColors.orange
+                                        : NBColors.blue,
+                                    border: Border.all(
+                                      color: NBColors.black,
+                                      width: 1.5,
+                                    ),
+                                    borderRadius: NBRadius.softAll,
+                                  ),
+                                  child: Text(
+                                    board.isShared ? 'SHARED' : 'PRIVATE',
+                                    style: NBText.label.copyWith(fontSize: 10),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: NBSpacing.sm),
+                            Row(
+                              children: [
+                                _lanePreviewChip(
+                                  'TODO',
+                                  kanban.laneCount(board.id, KanbanStatus.todo),
+                                  NBColors.blue,
+                                ),
+                                const SizedBox(width: NBSpacing.sm),
+                                _lanePreviewChip(
+                                  'DOING',
+                                  kanban.laneCount(
+                                    board.id,
+                                    KanbanStatus.doing,
+                                  ),
+                                  NBColors.pink,
+                                ),
+                                const SizedBox(width: NBSpacing.sm),
+                                _lanePreviewChip(
+                                  'DONE',
+                                  kanban.laneCount(board.id, KanbanStatus.done),
+                                  NBColors.green,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: NBSpacing.sm),
+                            Wrap(
+                              spacing: NBSpacing.xs,
+                              runSpacing: NBSpacing.xs,
+                              children: kanban
+                                  .previewTasks(board.id, limit: 2)
+                                  .map(
+                                    (task) => Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: kanban.resolveTaskColor(
+                                          task,
+                                          board: board,
+                                        ),
+                                        border: Border.all(
+                                          color: NBColors.black,
+                                          width: 1.5,
+                                        ),
+                                        borderRadius: NBRadius.softAll,
+                                      ),
+                                      child: Text(
+                                        task.title,
+                                        style: NBText.bodySmall,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    ),
-    );
-  }
-
-  Widget _buildAssigneeBadge(String avatar, String name) {
-    return Container(
-      width: 24,
-      height: 24,
-      decoration: BoxDecoration(
-        color: NBColors.primary,
-        border: Border.all(color: NBColors.black, width: 1.5),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        avatar,
-        style: NBText.label.copyWith(fontSize: 10),
-      ),
-    );
-  }
-
-  Color _colorForStatus(String groupId) {
-    switch (groupId) {
-      case 'todo': return NBColors.blue;
-      case 'doing': return NBColors.pink;
-      case 'done': return NBColors.green;
-      default: return NBColors.primary;
-    }
-  }
-
-  KanbanStatus _statusFromGroupIndex(int index) {
-    switch (index) {
-      case 0: return KanbanStatus.todo;
-      case 1: return KanbanStatus.doing;
-      case 2: return KanbanStatus.done;
-      default: return KanbanStatus.todo;
-    }
-  }
-
-  KanbanStatus _statusFromGroupId(String id) {
-    switch (id) {
-      case 'todo': return KanbanStatus.todo;
-      case 'doing': return KanbanStatus.doing;
-      case 'done': return KanbanStatus.done;
-      default: return KanbanStatus.todo;
-    }
-  }
-
-  void _showAddTaskDialog(BuildContext context, KanbanService kanban) {
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: NBColors.bg,
-        shape: RoundedRectangleBorder(
-          side: const BorderSide(color: NBColors.black, width: 3),
-          borderRadius: NBRadius.softAll,
-        ),
-        title: Text('NEW TASK', style: NBText.heading3),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildTextField(titleController, 'Title'),
-            const SizedBox(height: NBSpacing.md),
-            _buildTextField(descController, 'Description', maxLines: 3),
-          ],
-        ),
-        actions: [
-          NBButton(
-            label: 'Cancel',
-            fillColor: NBColors.white,
-            onTap: () => Navigator.pop(context),
-          ),
-          NBButton(
-            label: 'Add',
-            onTap: () {
-              if (titleController.text.isNotEmpty) {
-                kanban.addTask(
-                  title: titleController.text,
-                  description: descController.text,
-                  assignee: 'Renee',
-                  avatar: 'R',
-                );
-                Navigator.pop(context);
-              }
-            },
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: NBColors.white,
-        border: Border.all(color: NBColors.black, width: 2),
-        borderRadius: NBRadius.softAll,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: TextField(
-        controller: controller,
-        maxLines: maxLines,
-        decoration: InputDecoration(
-          hintText: hint,
-          border: InputBorder.none,
-          hintStyle: NBText.bodySmall,
-        ),
-      ),
-    );
-  }
-
-  void _showCompletionCelebration(BuildContext context, String taskId) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: NBColors.green,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(NBSpacing.md),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: NBColors.primary,
         shape: RoundedRectangleBorder(
+          borderRadius: NBRadius.softAll,
           side: const BorderSide(color: NBColors.black, width: 2),
+        ),
+        onPressed: () => _showCreateBoardDialog(context, kanban),
+        label: Text('CREATE BOARD', style: NBText.label),
+        icon: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _lanePreviewChip(String label, int count, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: color,
+          border: Border.all(color: NBColors.black, width: 1.5),
           borderRadius: NBRadius.softAll,
         ),
-        content: Row(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Icon(Icons.celebration, color: NBColors.black),
-            const SizedBox(width: 12),
-            Text(
-              'TASK COMPLETED! 🚀',
-              style: NBText.label.copyWith(color: NBColors.black),
+            Text(label, style: NBText.label.copyWith(fontSize: 10)),
+            Text('$count', style: NBText.monoSmall),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCreateBoardDialog(BuildContext context, KanbanService kanban) {
+    final nameController = TextEditingController();
+    final membersController = TextEditingController();
+    KanbanBoardVisibility visibility = KanbanBoardVisibility.private;
+    String? errorText;
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: NBColors.bg,
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(color: NBColors.black, width: 3),
+            borderRadius: NBRadius.softAll,
+          ),
+          title: Text('CREATE BOARD', style: NBText.heading3),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'Board name',
+                  errorText: errorText,
+                  labelStyle: NBText.bodySmall,
+                  filled: true,
+                  fillColor: NBColors.white,
+                  border: OutlineInputBorder(
+                    borderSide: const BorderSide(
+                      color: NBColors.black,
+                      width: 2,
+                    ),
+                    borderRadius: NBRadius.softAll,
+                  ),
+                ),
+              ),
+              const SizedBox(height: NBSpacing.md),
+              if (visibility == KanbanBoardVisibility.shared) ...[
+                TextField(
+                  controller: membersController,
+                  decoration: InputDecoration(
+                    labelText: 'Member user IDs (comma-separated)',
+                    labelStyle: NBText.bodySmall,
+                    filled: true,
+                    fillColor: NBColors.white,
+                    border: OutlineInputBorder(
+                      borderSide: const BorderSide(
+                        color: NBColors.black,
+                        width: 2,
+                      ),
+                      borderRadius: NBRadius.softAll,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: NBSpacing.md),
+              ],
+              Row(
+                children: [
+                  Expanded(
+                    child: NBButton(
+                      label: 'Private',
+                      fillColor: visibility == KanbanBoardVisibility.private
+                          ? NBColors.blue
+                          : NBColors.white,
+                      onTap: () => setState(
+                        () => visibility = KanbanBoardVisibility.private,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: NBSpacing.sm),
+                  Expanded(
+                    child: NBButton(
+                      label: 'Shared',
+                      fillColor: visibility == KanbanBoardVisibility.shared
+                          ? NBColors.purple
+                          : NBColors.white,
+                      onTap: () => setState(
+                        () => visibility = KanbanBoardVisibility.shared,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            NBButton(
+              label: 'Cancel',
+              fillColor: NBColors.white,
+              onTap: () => Navigator.pop(context),
+            ),
+            NBButton(
+              label: 'Create',
+              onTap: () async {
+                final cleanName = nameController.text.trim();
+                if (cleanName.isEmpty) {
+                  setState(() => errorText = 'Board name is required');
+                  return;
+                }
+                if (kanban.boards.any(
+                  (board) =>
+                      board.name.trim().toLowerCase() ==
+                      cleanName.toLowerCase(),
+                )) {
+                  setState(
+                    () => errorText = 'A board with this name already exists',
+                  );
+                  return;
+                }
+
+                final memberIds = membersController.text
+                    .split(',')
+                    .map((id) => id.trim())
+                    .where((id) => id.isNotEmpty)
+                    .toSet()
+                    .toList();
+                if (visibility == KanbanBoardVisibility.shared &&
+                    memberIds.isEmpty) {
+                  setState(
+                    () => errorText =
+                        'Add at least one member ID for shared boards',
+                  );
+                  return;
+                }
+
+                final board = await kanban.createBoard(
+                  name: cleanName,
+                  visibility: visibility,
+                  memberUserIds: memberIds,
+                );
+                if (!context.mounted) return;
+                if (board == null) {
+                  setState(
+                    () =>
+                        errorText = 'Unable to create board. Please try again.',
+                  );
+                  return;
+                }
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => BoardDetailScreen(
+                      boardId: board.id,
+                      kanbanService: kanban,
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),
-        duration: const Duration(seconds: 2),
       ),
     );
   }
