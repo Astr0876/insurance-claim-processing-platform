@@ -5,8 +5,10 @@ import '../../core/providers/app_state.dart';
 import '../../core/theme/neubrut_tokens.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../core/services/assistant_service.dart';
+import 'screens/knowledge_graph_screen.dart';
 
 class ChatMessage {
+// ... existing ChatMessage ...
   final String text;
   final bool isUser;
   final bool isStreaming;
@@ -14,6 +16,7 @@ class ChatMessage {
 }
 
 class AssistantScreen extends StatefulWidget {
+// ... existing AssistantScreen ...
   const AssistantScreen({super.key});
 
   @override
@@ -21,6 +24,7 @@ class AssistantScreen extends StatefulWidget {
 }
 
 class _AssistantScreenState extends State<AssistantScreen> {
+// ... existing fields ...
   final TextEditingController _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
@@ -28,6 +32,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
   @override
   void initState() {
+// ... existing initState ...
     super.initState();
     _messages.add(ChatMessage(
       text: 'Hello! I am Lumina, your proactive student sidekick. How can I help you today? 🧠',
@@ -36,6 +41,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
   }
 
   void _sendMessage() {
+// ... existing _sendMessage ...
     if (_controller.text.trim().isEmpty) return;
 
     final text = _controller.text;
@@ -102,6 +108,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
   }
 
   void _scrollToBottom() {
+// ... existing _scrollToBottom ...
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -115,6 +122,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
   @override
   Widget build(BuildContext context) {
+// ... existing build ...
     final state = Provider.of<AppState>(context);
     final assistant = state.assistant;
 
@@ -185,8 +193,36 @@ class _AssistantScreenState extends State<AssistantScreen> {
                         ],
                       ),
                     ),
+                    // Knowledge Graph button
+                    if (assistant.hasDocument)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const KnowledgeGraphScreen()),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.orange,
+                              border: Border.all(color: NBColors.black, width: 2),
+                              borderRadius: NBRadius.softAll,
+                              boxShadow: NBShadows.small,
+                            ),
+                            child: const Icon(
+                              Icons.hub_rounded,
+                              color: NBColors.black,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
                     // Clear button
                     GestureDetector(
+// ... existing Clear button ...
                       onTap: () {
                         setState(() {
                           _messages.clear();
@@ -214,6 +250,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     const SizedBox(width: 8),
                     // Upload button
                     GestureDetector(
+// ... existing Upload button ...
                       onTap: () async {
                         final messenger = ScaffoldMessenger.of(context);
                         try {
@@ -252,6 +289,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   ],
                 ),
                 if (assistant.mode == AssistantMode.luminaRag && (!assistant.isModelLoaded || assistant.isIndexing))
+// ... existing indexing UI ...
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: Column(
@@ -298,6 +336,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     ),
                   ),
                 const SizedBox(height: 12),
+// ... rest of build ...
                 // ── Mode Switcher ─────────────────────────────────────
                 Row(
                   children: [

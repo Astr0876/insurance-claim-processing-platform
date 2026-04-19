@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../utils/constants.dart';
 import 'gradio_service.dart';
 
@@ -175,6 +176,19 @@ class TimetableTextParser {
     'friday': 'Friday',
   };
 
+  static const Map<String, String> _facultyMap = {
+    "KKD": "Dr. Kailas Devadkar",
+    "NR": "Dr. Nataasha Raul",
+    "JS": "Prof. J. Sharma",
+    "RS": "Prof. R. Singh",
+    "PM": "Prof. P. Mehta",
+    "SK": "Prof. S. Kumar",
+    "AD": "Prof. A. Desai",
+    "MG": "Prof. M. Gupta",
+    "VR": "Prof. V. Rao",
+    "SP": "Prof. S. Patil",
+  };
+
   TimetableParseResult parseRawText(String rawText) {
     final lines = rawText.split(RegExp(r'[\r\n]+'));
     final slots = <ParsedClassSlot>[];
@@ -254,16 +268,29 @@ class TimetableTextParser {
     ).firstMatch(remainder);
     final room = roomMatch?.group(0)?.replaceAll(RegExp(r'\s+'), '-') ?? 'TBA';
 
-    var subject = remainder;
-    if (roomMatch != null) {
-      subject = subject.replaceAll(roomMatch.group(0)!, '');
-    }
-    subject = subject
-        .replaceAll(RegExp(r'[/|]'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-    if (subject.isEmpty) {
-      subject = 'Untitled Class';
+    // --- Backend Port: Subject/Faculty Pattern ---
+    final entryMatch = RegExp(
+      r'\b([A-Z]{2,})\s*/\s*([A-Z])?\s*/?\s*([A-Z]{2,})\b',
+    ).firstMatch(remainder);
+
+    String subject;
+    if (entryMatch != null) {
+      final subCode = entryMatch.group(1)!;
+      final facCode = entryMatch.group(3)!;
+      final faculty = _facultyMap[facCode] ?? facCode;
+      subject = '$subCode ($faculty)';
+    } else {
+      subject = remainder;
+      if (roomMatch != null) {
+        subject = subject.replaceAll(roomMatch.group(0)!, '');
+      }
+      subject = subject
+          .replaceAll(RegExp(r'[/|]'), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      if (subject.isEmpty) {
+        subject = 'Untitled Class';
+      }
     }
 
     final duration = _minutesBetween(startTime, endTime) ?? 60;
@@ -416,38 +443,28 @@ class TimetableService extends ChangeNotifier {
 
       String rawText = '';
       
-      // --- ON-DEVICE EXTRACTION (Lumina Mandate) ---
+      // --- ON-DEVICE EXTRACTION (Lumina Mandate: FULLY OFFLINE) ---
       if (type == TimetableImportType.pdf) {
-        debugPrint('LUMINA: Performing On-Device PDF Extraction...');
+        debugPrint('LUMINA: Attempting On-Device PDF Extraction...');
         rawText = await _extractTextFromPdf(file);
       } else {
-        // For images, we ideally want on-device OCR. 
-        // Since we don't have google_mlkit_text_recognition yet, we fallback to Gradio
-        // but mark it as 'Hybrid' in logs.
-        debugPrint('LUMINA: On-Device Image OCR not available, using fallback...');
+        debugPrint('LUMINA: Attempting On-Device Image OCR...');
+        rawText = await _extractTextFromImage(file);
+      }
+
+      // --- SEAMLESS FALLBACK ---
+      if (rawText.isEmpty) {
+        debugPrint('LUMINA: On-device extraction failed/empty, falling back to Gradio seamlessly...');
         return _importViaGradio(filePath, type);
       }
 
       _lastRawExtractedText = rawText;
 
-      if (rawText.isEmpty) {
-        return TimetableImportResult.failure(
-          filePath: filePath,
-          sourceType: type,
-          message: 'Could not extract any text on-device.',
-          rawText: rawText,
-        );
-      }
-
       final parsed = parser.parseRawText(rawText);
+      // If parsing fails on the on-device text, also try the backend
       if (parsed.slots.isEmpty) {
-        return TimetableImportResult.failure(
-          filePath: filePath,
-          sourceType: type,
-          message: 'No class slots could be parsed from on-device extraction.',
-          rawText: rawText,
-          issues: parsed.issues,
-        );
+        debugPrint('LUMINA: Parsing on-device text failed, falling back to Gradio seamlessly...');
+        return _importViaGradio(filePath, type);
       }
 
       return TimetableImportResult.success(
@@ -458,22 +475,36 @@ class TimetableService extends ChangeNotifier {
         issues: parsed.issues,
       );
     } catch (e) {
-      return TimetableImportResult.failure(
-        filePath: filePath,
-        sourceType: type,
-        message: 'On-device import failed: $e',
-      );
+      debugPrint('LUMINA: On-device critical error, falling back to Gradio: $e');
+      return _importViaGradio(filePath, type);
     }
   }
 
   Future<String> _extractTextFromPdf(File file) async {
+    PdfDocument? document;
     try {
-      final PdfDocument document = PdfDocument(inputBytes: await file.readAsBytes());
+      document = PdfDocument(inputBytes: await file.readAsBytes());
       final String text = PdfTextExtractor(document).extractText();
-      document.dispose();
       return text;
     } catch (e) {
       debugPrint('PDF Extraction Error: $e');
+      return '';
+    } finally {
+      document?.dispose();
+    }
+  }
+
+  Future<String> _extractTextFromImage(File file) async {
+    try {
+      final inputImage = InputImage.fromFile(file);
+      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+      
+      String text = recognizedText.text;
+      await textRecognizer.close();
+      return text;
+    } catch (e) {
+      debugPrint('Image OCR Error: $e');
       return '';
     }
   }
@@ -481,17 +512,15 @@ class TimetableService extends ChangeNotifier {
   Future<TimetableImportResult> _importViaGradio(String filePath, TimetableImportType type) async {
     try {
       final file = File(filePath);
-      // Step 1: Upload to Gradio
       final remotePath = await _gradioService.uploadFile(file);
       if (remotePath == null) {
         return TimetableImportResult.failure(
           filePath: filePath,
           sourceType: type,
-          message: 'Failed to upload file to AI service.',
+          message: 'Lumina could not process this file at the moment.',
         );
       }
 
-      // Step 2: Call process_timetable
       final result = await _gradioService.callEndpoint('process_timetable', [
         {'path': remotePath}
       ]);
@@ -500,7 +529,7 @@ class TimetableService extends ChangeNotifier {
         return TimetableImportResult.failure(
           filePath: filePath,
           sourceType: type,
-          message: 'AI service did not return a valid result.',
+          message: 'Lumina could not analyze the timetable structure.',
         );
       }
 
@@ -509,6 +538,16 @@ class TimetableService extends ChangeNotifier {
       _lastRawExtractedText = rawText;
 
       final parsed = parser.parseRawText(rawText);
+      if (parsed.slots.isEmpty) {
+        return TimetableImportResult.failure(
+          filePath: filePath,
+          sourceType: type,
+          message: 'No timetable entries detected.',
+          rawText: rawText,
+          issues: parsed.issues,
+        );
+      }
+
       return TimetableImportResult.success(
         filePath: filePath,
         sourceType: type,
@@ -521,7 +560,7 @@ class TimetableService extends ChangeNotifier {
       return TimetableImportResult.failure(
         filePath: filePath,
         sourceType: type,
-        message: 'Gradio fallback failed: $e',
+        message: 'Lumina experienced a connection issue.',
       );
     }
   }

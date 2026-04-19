@@ -4,7 +4,12 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
+  audioplayers_windows
   connectivity_plus
+  flutter_secure_storage_windows
+  flutter_tts
+  permission_handler_windows
+  record_windows
   syncfusion_pdfviewer_windows
   url_launcher_windows
 )

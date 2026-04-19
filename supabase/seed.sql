@@ -1,32 +1,28 @@
 -- =============================================================================
--- LUMINA SEED SCRIPT
--- Highly realistic, interconnected mock data for 3 users
--- Targeted for Engineering Students
+-- LUMINA SEED SCRIPT (Fixed for Permissions)
 -- =============================================================================
 
-BEGIN;
-
--- 1. Create Demo Users in auth.users
--- Password for all: password123
+-- 1. Create Demo Users
+-- Note: If you see a warning popup in Supabase, click "Run without RLS"
 DO $$
 DECLARE
   renee_id uuid := 'a0000000-0000-0000-0000-000000000001';
   alex_id  uuid := 'a0000000-0000-0000-0000-000000000002';
   sam_id   uuid := 'a0000000-0000-0000-0000-000000000003';
 BEGIN
-  -- Insert Renee
+  -- Renee
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'renee@example.com') THEN
     INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, email_change, email_change_token_new, recovery_token)
     VALUES (renee_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'renee@example.com', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"student_name":"Renee"}', now(), now(), '', '', '', '');
   END IF;
 
-  -- Insert Alex
+  -- Alex
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'alex@example.com') THEN
     INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, email_change, email_change_token_new, recovery_token)
     VALUES (alex_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'alex@example.com', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"student_name":"Alex"}', now(), now(), '', '', '', '');
   END IF;
 
-  -- Insert Sam
+  -- Sam
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'sam@example.com') THEN
     INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, email_change, email_change_token_new, recovery_token)
     VALUES (sam_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'sam@example.com', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"student_name":"Sam"}', now(), now(), '', '', '', '');
@@ -41,7 +37,7 @@ VALUES
   ('a0000000-0000-0000-0000-000000000003', 'Sam', 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sam')
 ON CONFLICT (id) DO NOTHING;
 
--- 3. Seed public.timetable_entries (Renee's Engineering Week)
+-- 3. Seed public.timetable_entries (Realistic Engineering Student Schedule)
 INSERT INTO public.timetable_entries (user_id, day, subject, start_time, room, duration_minutes)
 VALUES
   ('a0000000-0000-0000-0000-000000000001', 'Monday', 'Operating Systems', '09:00 AM', 'Room 301', 90),
@@ -54,7 +50,7 @@ VALUES
   ('a0000000-0000-0000-0000-000000000001', 'Friday', 'Data Structures', '09:00 AM', 'Room 205', 90),
   ('a0000000-0000-0000-0000-000000000001', 'Friday', 'Networks Lab', '02:00 PM', 'Lab 2', 120);
 
--- 4. Seed public.attendance (Hovering ~75%)
+-- 4. Seed public.attendance (Hovering around 75%)
 INSERT INTO public.attendance (user_id, subject, attended_count, total_count, target_percentage)
 VALUES
   ('a0000000-0000-0000-0000-000000000001', 'Operating Systems', 15, 20, 75.0),
@@ -102,21 +98,21 @@ VALUES
 INSERT INTO public.study_rooms (id, owner_id, name, code)
 VALUES
   ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'OS Survival Squad', 'OS-VIVA-26'),
-  ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'LUMINA Dev Hub', 'LUM-DEV-01');
+  ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'LUMINA Dev Hub', 'LUM-DEV-01')
+ON CONFLICT (id) DO NOTHING;
 
--- 8. Seed public.room_members (All 3 in both)
+-- 8. Seed public.room_members
 INSERT INTO public.room_members (room_id, user_id, role)
 VALUES
   ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'admin'),
   ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 'editor'),
   ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000003', 'viewer'),
   ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'admin'),
-  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'editor'), -- Note: role update if duplicate handled by unique constraint logic
   ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'editor'),
   ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000003', 'editor')
 ON CONFLICT (room_id, user_id) DO NOTHING;
 
--- 9. Seed public.hub_messages (20 Messages about OS Lab Viva)
+-- 9. Seed public.hub_messages (Messages about OS Lab Viva)
 INSERT INTO public.hub_messages (room_id, sender_id, content, type)
 VALUES
   ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Guys, who finished the OS Lab Viva prep?', 'text'),
@@ -175,5 +171,3 @@ VALUES
   ('a0000000-0000-0000-0000-000000000003', 40.00, 'Shopping', 'spent', ARRAY['clothes'], 1, 'New hoodie', now() - interval '1 day'),
   ('a0000000-0000-0000-0000-000000000003', 9.00, 'Food', 'spent', ARRAY['snacks'], 1, 'Late night ramen', now() - interval '5 hours'),
   ('a0000000-0000-0000-0000-000000000003', 11.50, 'Food', 'spent', ARRAY['lunch'], 1, 'Poke bowl', now() - interval '30 minutes');
-
-COMMIT;

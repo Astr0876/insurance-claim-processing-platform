@@ -2,10 +2,13 @@ import 'dart:math';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:runanywhere/runanywhere.dart';
 import '../utils/constants.dart';
 import 'gradio_service.dart';
+import '../../features/assistant/models/assistant_graph_models.dart';
 
 class SearchResult {
+// ... existing SearchResult class ...
   final String snippet;
   final double relevance;
   final String source;
@@ -30,6 +33,7 @@ class AssistantService extends ChangeNotifier {
   String? _docId;
   
   // SDK States (Simulated TensorFlow.js Local)
+// ... existing fields ...
   bool _isInitialized = false;
   bool _isModelDownloaded = false;
   bool _isModelLoaded = false;
@@ -55,6 +59,7 @@ class AssistantService extends ChangeNotifier {
   String get statusMessage => _statusMessage;
 
   void setMode(AssistantMode newMode) {
+// ... existing setMode ...
     _mode = newMode;
     if (_mode == AssistantMode.luminaRag && !_isInitialized) {
       setupLumina();
@@ -70,22 +75,44 @@ class AssistantService extends ChangeNotifier {
   }
 
   Future<void> downloadLumina() async {
-    for (int i = 0; i <= 10; i++) {
-      _downloadProgress = i / 10;
-      _statusMessage = 'Downloading Model: ${i * 10}%';
-      notifyListeners();
-      await Future.delayed(const Duration(milliseconds: 150));
-    }
-    _isModelDownloaded = true;
-    _isModelLoaded = true;
-    _statusMessage = 'TF.js Engine Loaded';
+    const modelId = 'smollm2-360m-q8_0';
+    _statusMessage = 'Starting Download...';
+    _downloadProgress = 0;
     notifyListeners();
+
+    try {
+      await for (final progress in RunAnywhere.downloadModel(modelId)) {
+        _downloadProgress = progress.percentage;
+        _statusMessage = 'Downloading Model: ${(_downloadProgress * 100).toStringAsFixed(1)}%';
+        notifyListeners();
+        if (progress.state.isCompleted) break;
+      }
+
+      _statusMessage = 'Loading Model...';
+      notifyListeners();
+      await RunAnywhere.loadModel(modelId);
+
+      _isModelDownloaded = true;
+      _isModelLoaded = true;
+      _statusMessage = 'Lumina Engine Loaded';
+      notifyListeners();
+    } catch (e) {
+      _statusMessage = 'Download Error: $e';
+      notifyListeners();
+    }
   }
 
   Future<void> loadLumina() async {
-    _isModelLoaded = true;
-    _statusMessage = 'Lumina is Ready (Local)';
-    notifyListeners();
+    const modelId = 'smollm2-360m-q8_0';
+    try {
+      await RunAnywhere.loadModel(modelId);
+      _isModelLoaded = true;
+      _statusMessage = 'Lumina is Ready (On-Device)';
+      notifyListeners();
+    } catch (e) {
+      _statusMessage = 'Load Error: $e';
+      notifyListeners();
+    }
   }
 
   bool _isIndexingPaused = false;
@@ -98,6 +125,7 @@ class AssistantService extends ChangeNotifier {
   }
 
   Future<void> indexDocument(String content) async {
+// ... existing indexDocument ...
     if (_isIndexingPaused) {
       debugPrint("[Power Saving] Indexing skipped: Battery Guardian Active.");
       return;
@@ -125,6 +153,7 @@ class AssistantService extends ChangeNotifier {
   }
 
   Future<bool> uploadNotesToAI(File file) async {
+// ... existing uploadNotesToAI ...
     _isIndexing = true;
     _indexingProgress = 0.2;
     _statusMessage = 'Uploading notes to AI...';
@@ -175,8 +204,135 @@ class AssistantService extends ChangeNotifier {
     notifyListeners();
   }
 
+  KnowledgeGraphData getKnowledgeGraph() {
+    if (!_hasDocument) return KnowledgeGraphData(nodes: [], edges: []);
+
+    final paragraphs = _documentContent.split(RegExp(r'\n\n+'))
+        .where((p) => p.trim().length > 20)
+        .toList();
+    
+    final nodes = <GraphNode>[];
+    final edges = <GraphEdge>[];
+    final conceptMap = <String, List<int>>{}; // concept -> list of paragraph indices
+
+    // 1. Create Chunk Nodes and extract concepts
+    for (int i = 0; i < paragraphs.length; i++) {
+      final para = paragraphs[i];
+      final concepts = _extractConcepts(para);
+      
+      nodes.add(GraphNode(
+        id: 'chunk_$i',
+        label: '${para.substring(0, min(para.length, 30)).replaceAll('\n', ' ')}...',
+        type: 'chunk',
+        metadata: {'content': para},
+      ));
+
+      for (final concept in concepts) {
+        if (!conceptMap.containsKey(concept)) {
+          conceptMap[concept] = [];
+        }
+        conceptMap[concept]!.add(i);
+      }
+    }
+
+    // 2. Create Concept Nodes and link to chunks
+    int conceptIdx = 0;
+    conceptMap.forEach((concept, paraIndices) {
+      // Only include concepts that appear in multiple paragraphs or are significant
+      if (paraIndices.isNotEmpty) {
+        final conceptId = 'concept_$conceptIdx';
+        nodes.add(GraphNode(
+          id: conceptId,
+          label: concept,
+          type: 'concept',
+        ));
+
+        for (final pIdx in paraIndices) {
+          edges.add(GraphEdge(
+            from: 'chunk_$pIdx',
+            to: conceptId,
+            weight: 1.0,
+          ));
+        }
+        conceptIdx++;
+      }
+    });
+
+    // 3. Link chunks based on semantic similarity (keyword overlap)
+    for (int i = 0; i < paragraphs.length; i++) {
+      for (int j = i + 1; j < paragraphs.length; j++) {
+        final similarity = _calculateSimilarity(paragraphs[i], paragraphs[j]);
+        if (similarity > 0.25) {
+          edges.add(GraphEdge(
+            from: 'chunk_$i',
+            to: 'chunk_$j',
+            weight: similarity,
+          ));
+        }
+      }
+    }
+
+    return KnowledgeGraphData(nodes: nodes, edges: edges);
+  }
+
+  List<String> _extractConcepts(String text) {
+    // Simple concept extraction: words starting with capital letters (excluding start of sentence)
+    // or long words that appear important.
+    final words = text.split(RegExp(r'[\s,.;:()]+'));
+    final concepts = <String>{};
+    
+    for (int i = 1; i < words.length; i++) {
+      final word = words[i];
+      if (word.length > 4 && 
+          word[0].toUpperCase() == word[0] && 
+          word.toLowerCase() != word) {
+        // Clean word
+        final clean = word.replaceAll(RegExp(r'[^a-zA-Z]'), '');
+        if (clean.length > 3) concepts.add(clean);
+      }
+    }
+    
+    // Also include some predefined "academic" keywords if present
+    final academicKeywords = ['Quantum', 'Algorithm', 'Synthesis', 'Mechanism', 'Process', 'Theory'];
+    for (final kw in academicKeywords) {
+      if (text.contains(kw)) concepts.add(kw);
+    }
+
+    return concepts.take(5).toList();
+  }
+
+  double _calculateSimilarity(String a, String b) {
+    final wordsA = a.toLowerCase().split(RegExp(r'\W+')).where((w) => w.length > 3).toSet();
+    final wordsB = b.toLowerCase().split(RegExp(r'\W+')).where((w) => w.length > 3).toSet();
+    
+    if (wordsA.isEmpty || wordsB.isEmpty) return 0.0;
+    
+    final intersection = wordsA.intersection(wordsB).length;
+    final union = wordsA.union(wordsB).length;
+    
+    return intersection / union;
+  }
+
   Stream<String> getAnswerStream(String query) async* {
     if (_mode == AssistantMode.standard) {
+      if (_isModelLoaded) {
+        yield "🧠 [On-Device LLM] Thinking...\n\n";
+        try {
+          final streamResult = await RunAnywhere.generateStream(
+            query,
+            options: LLMGenerationOptions(
+              maxTokens: 500,
+              systemPrompt: "You are Lumina, a proactive student sidekick. Keep answers helpful and concise.",
+            ),
+          );
+          await for (final token in streamResult.stream) {
+            yield token;
+          }
+          return;
+        } catch (e) {
+          yield "On-device error: $e. Falling back to simple response.\n\n";
+        }
+      }
       yield await askQuestion(query);
       return;
     }
@@ -215,6 +371,16 @@ class AssistantService extends ChangeNotifier {
 
   Future<String> askQuestion(String query) async {
     final lowerQuery = query.toLowerCase();
+
+    // Try on-device chat if model loaded
+    if (_isModelLoaded) {
+      try {
+        return await RunAnywhere.chat(query);
+      } catch (e) {
+        debugPrint('On-device chat error: $e');
+      }
+    }
+
     final results = _internalSearch(query);
 
     if (results.isEmpty) {
@@ -232,6 +398,7 @@ class AssistantService extends ChangeNotifier {
   }
 
   List<SearchResult> _internalSearch(String query) {
+// ... existing _internalSearch ...
     if (!_hasDocument || query.trim().isEmpty) {
       return [];
     }

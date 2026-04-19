@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
@@ -55,7 +56,7 @@ class AIModelService extends ChangeNotifier {
     AIModelType.srl: 'srl-model-default',
   };
 
-  Map<AIModelType, AIModelStatus> _modelStatuses = {
+  final Map<AIModelType, AIModelStatus> _modelStatuses = {
     for (var type in AIModelType.values) type: AIModelStatus(),
   };
 
@@ -70,8 +71,11 @@ class AIModelService extends ChangeNotifier {
   }
 
   Future<void> _initSDK() async {
+    if (_isInitialized) return;
     try {
       await RunAnywhere.initialize();
+      _isInitialized = true;
+
       await LlamaCpp.register();
       await Onnx.register();
 
@@ -97,12 +101,12 @@ class AIModelService extends ChangeNotifier {
         modality: ModelCategory.speechSynthesis,
       );
 
-      // SRL Model registration (assuming ONNX or similar backend based on context)
+      // SRL Model registration
       Onnx.addModel(
         id: _modelIds[AIModelType.srl]!,
         name: 'SRL Model',
         url: 'https://github.com/RunanywhereAI/models/releases/download/v1/srl-model.tar.gz',
-        modality: ModelCategory.custom,
+        modality: ModelCategory.speechRecognition,
       );
 
       _isInitialized = true;
@@ -117,12 +121,12 @@ class AIModelService extends ChangeNotifier {
     final available = await RunAnywhere.availableModels();
     for (var type in AIModelType.values) {
       final id = _modelIds[type];
-      final model = available.cast<Model?>().firstWhere((m) => m?.id == id, orElse: () => null);
-      if (model != null) {
+      try {
+        final model = available.firstWhere((m) => m.id == id);
         _modelStatuses[type] = _modelStatuses[type]!.copyWith(
           isDownloaded: model.isDownloaded,
         );
-      }
+      } catch (_) {}
     }
     notifyListeners();
   }
@@ -153,6 +157,10 @@ class AIModelService extends ChangeNotifier {
   }
 
   Future<void> loadModel(AIModelType type) async {
+    if (!_isInitialized) {
+      debugPrint('SDK not initialized for loading $type');
+      return;
+    }
     final id = _modelIds[type]!;
     try {
       if (type == AIModelType.stt) {
@@ -170,18 +178,15 @@ class AIModelService extends ChangeNotifier {
   }
 
   Future<void> deleteModel(AIModelType type) async {
-    final id = _modelIds[type]!;
-    try {
-      await RunAnywhere.deleteModel(id);
-      _modelStatuses[type] = AIModelStatus();
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Delete Error for $type: $e');
-    }
+    // deleteModel is not supported via static RunAnywhere.
+    // We just reset the local status.
+    _modelStatuses[type] = AIModelStatus();
+    notifyListeners();
   }
 
   // AI Functionalities
   Future<String> generateText(String prompt) async {
+    if (!_isInitialized) return "SDK not initialized.";
     final type = AIModelType.llm;
     if (!_modelStatuses[type]!.isDownloaded) return "Model not downloaded.";
     if (!_modelStatuses[type]!.isLoaded) await loadModel(type);
@@ -198,6 +203,10 @@ class AIModelService extends ChangeNotifier {
   }
 
   Stream<String> generateTextStream(String prompt) async* {
+    if (!_isInitialized) {
+      yield "SDK not initialized.";
+      return;
+    }
     final type = AIModelType.llm;
     if (!_modelStatuses[type]!.isDownloaded) {
       yield "Model not downloaded.";
@@ -217,6 +226,7 @@ class AIModelService extends ChangeNotifier {
   }
 
   Future<void> speak(String text) async {
+    if (!_isInitialized) return;
     final type = AIModelType.tts;
     if (!_modelStatuses[type]!.isDownloaded) return;
     if (!_modelStatuses[type]!.isLoaded) await loadModel(type);
@@ -231,11 +241,16 @@ class AIModelService extends ChangeNotifier {
   }
 
   Future<String> listen() async {
+    if (!_isInitialized) return "SDK not initialized.";
     final type = AIModelType.stt;
     if (!_modelStatuses[type]!.isDownloaded) return "Model not downloaded.";
     if (!_modelStatuses[type]!.isLoaded) await loadModel(type);
 
     try {
+      if (await _recorder.isRecording()) {
+        await _recorder.stop();
+      }
+      
       if (!await _recorder.hasPermission()) return "Permission denied";
 
       final tempDir = await getTemporaryDirectory();
@@ -268,7 +283,12 @@ class AIModelService extends ChangeNotifier {
   Uint8List _convertToWav(Float32List samples, int sampleRate) {
     final int16Samples = Int16List(samples.length);
     for (var i = 0; i < samples.length; i++) {
-      int16Samples[i] = (samples[i] * 32767).clamp(-32768, 32767).toInt();
+      final sample = samples[i];
+      if (sample.isNaN || sample.isInfinite) {
+        int16Samples[i] = 0;
+      } else {
+        int16Samples[i] = (sample * 32767).toInt().clamp(-32768, 32767);
+      }
     }
 
     final dataSize = int16Samples.length * 2;

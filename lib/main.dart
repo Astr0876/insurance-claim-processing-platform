@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:runanywhere/runanywhere.dart';
+import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
+import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 import 'core/providers/app_state.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/neubrut_tokens.dart';
@@ -14,6 +17,35 @@ import 'features/auth/screens/auth_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // 1. Initialize RunAnywhere SDK
+  await RunAnywhere.initialize();
+  await LlamaCpp.register();
+  await Onnx.register();
+
+  // 2. Register Models
+  LlamaCpp.addModel(
+    id: 'smollm2-360m-q8_0',
+    name: 'SmolLM2 360M Q8_0',
+    url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+    memoryRequirement: 500000000,
+  );
+
+  // STT Model
+  Onnx.addModel(
+    id: 'sherpa-onnx-whisper-tiny.en',
+    name: 'Whisper Tiny English',
+    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+    modality: ModelCategory.speechRecognition,
+  );
+
+  // TTS Model
+  Onnx.addModel(
+    id: 'vits-piper-en_US-lessac-medium',
+    name: 'Piper US English (Lessac)',
+    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
+    modality: ModelCategory.speechSynthesis,
+  );
+
   await dotenv.load(fileName: ".env");
 
   await Supabase.initialize(

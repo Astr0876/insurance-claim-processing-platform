@@ -4,6 +4,10 @@ import '../../core/providers/app_state.dart';
 import '../../core/theme/neubrut_tokens.dart';
 import '../../core/utils/helpers.dart';
 import '../shared/widgets.dart';
+import '../engine/engine_screen.dart';
+import '../kanban/kanban_screen.dart';
+import '../latex/latex_preview_screen.dart';
+import '../expenses/screens/expense_screen.dart';
 import 'package:intl/intl.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -104,11 +108,11 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ),
 
-            // ── Bunk calculator ────────────────────────────────────
+            // ── Engine Pulse ──────────────────────────────────────
             SliverToBoxAdapter(
               child: FadeTransition(
                 opacity: _fadeAnimations[4],
-                child: _buildBunkSummary(state),
+                child: _buildEnginePulse(state),
               ),
             ),
 
@@ -463,10 +467,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: Row(
         children: [
-          // Attendance
+          // Attendance -> THE ENGINE
           Expanded(
             child: NBCard(
-              onTap: () => widget.onNavigate?.call(3),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EngineScreen())),
               shadows: NBShadows.medium,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -508,7 +512,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           // Focus
           Expanded(
             child: NBCard(
-              onTap: () => widget.onNavigate?.call(4),
+              onTap: () => widget.onNavigate?.call(1),
               shadows: NBShadows.medium,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -734,13 +738,13 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildQuickActions() {
     final actions = [
-      (Icons.calendar_month_rounded, 'Timetable', NBColors.blue, 1),
-      (Icons.view_kanban_rounded, 'Kanban', NBColors.warning, 2),
-      (Icons.fact_check_rounded, 'Attendance', NBColors.green, 3),
-      (Icons.psychology_rounded, 'Focus', NBColors.purple, 4),
-      (Icons.smart_toy_rounded, 'Ask AI', NBColors.pink, 5),
-      (Icons.groups_rounded, 'Hub', NBColors.orange, 6),
-      (Icons.payments_rounded, 'Spent', NBColors.primary, 8),
+      (Icons.settings_input_component_rounded, 'Engine', NBColors.primary, -1),
+      (Icons.psychology_rounded, 'Work', NBColors.blue, 1),
+      (Icons.auto_awesome_rounded, 'Brain', NBColors.purple, 2),
+      (Icons.groups_rounded, 'Squad', NBColors.warning, 3),
+      (Icons.view_kanban_rounded, 'Kanban', NBColors.blue, -2),
+      (Icons.description_rounded, 'LaTeX', NBColors.warning, -3),
+      (Icons.payments_rounded, 'Spent', NBColors.pink, -4),
     ];
 
     return Padding(
@@ -750,20 +754,34 @@ class _DashboardScreenState extends State<DashboardScreen>
         children: [
           const SectionHeader(title: 'Quick Actions'),
           const SizedBox(height: 8),
-          Row(
-            children: actions.map((a) {
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: a.$4 < 7 ? 8 : 0),
-                  child: _actionButton(
-                    icon: a.$1,
-                    label: a.$2,
-                    color: a.$3,
-                    onTap: () => widget.onNavigate?.call(a.$4),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: actions.map((a) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: SizedBox(
+                    width: 75,
+                    child: _actionButton(
+                      icon: a.$1,
+                      label: a.$2,
+                      color: a.$3,
+                      onTap: () {
+                        if (a.$4 >= 0) {
+                          widget.onNavigate?.call(a.$4);
+                        } else {
+                          // Explicit routes for drawer items
+                          if (a.$4 == -1) Navigator.push(context, MaterialPageRoute(builder: (_) => const EngineScreen()));
+                          if (a.$4 == -2) Navigator.push(context, MaterialPageRoute(builder: (_) => const KanbanScreen()));
+                          if (a.$4 == -3) Navigator.push(context, MaterialPageRoute(builder: (_) => const LaTeXPreviewScreen()));
+                          if (a.$4 == -4) Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpenseScreen()));
+                        }
+                      },
+                    ),
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
         ],
       ),
@@ -795,9 +813,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // ── Bunk summary ──────────────────────────────────────────────────
+  // ── Engine Pulse ──────────────────────────────────────────────────
 
-  Widget _buildBunkSummary(AppState state) {
+  Widget _buildEnginePulse(AppState state) {
     final safeBunks = state.attendance.totalSafeBunks;
     final classesToRecover = state.attendance.classesToRecover;
     final overallPct = state.attendance.overallPercentage;
@@ -814,14 +832,27 @@ class _DashboardScreenState extends State<DashboardScreen>
             Row(
               children: [
                 const Icon(
-                  Icons.calculate_rounded,
+                  Icons.settings_input_component_rounded,
                   color: NBColors.black,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'BUNK CALCULATOR',
+                  'ENGINE PULSE',
                   style: NBText.label.copyWith(letterSpacing: 2),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EngineScreen())),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: NBColors.white,
+                      border: Border.all(color: NBColors.black, width: 1.5),
+                      borderRadius: NBRadius.softAll,
+                    ),
+                    child: Text('VIEW ENGINE', style: NBText.label.copyWith(fontSize: 8)),
+                  ),
                 ),
               ],
             ),
@@ -836,7 +867,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
-                        'classes you can safely\nbunk without dropping below 75%',
+                        'classes you can safely\nbunk while staying optimal.',
                         style: NBText.bodySmall,
                       ),
                     ),
@@ -859,7 +890,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
-                        'CLASSES TO RECOVER\nconsecutive classes needed to reach 75%',
+                        'CLASSES TO RECOVER\nto reach the 75% threshold.',
                         style: NBText.bodySmall.copyWith(color: NBColors.white),
                       ),
                     ),

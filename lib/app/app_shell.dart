@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../features/auth/screens/auth_screen.dart';
 import '../../core/theme/neubrut_tokens.dart';
-import '../../core/theme/app_theme.dart';
 import '../../features/dashboard/dashboard_screen.dart';
-import '../../features/timetable/timetable_screen.dart';
+import '../../features/dashboard/lets_go_screen.dart';
+import '../../features/engine/engine_screen.dart';
 import '../../features/kanban/kanban_screen.dart';
-import '../../features/attendance/attendance_screen.dart';
 import '../../features/focus/focus_screen.dart';
 import '../../features/assistant/assistant_screen.dart';
 import '../../features/study_hub/screens/rooms_screen.dart';
@@ -16,6 +14,7 @@ import '../../features/expenses/screens/expense_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../core/providers/app_state.dart';
 import 'package:provider/provider.dart';
+import '../../core/widgets/nb_card.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -26,7 +25,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0; 
-  Future<Map<String, dynamic>?>? _profileFuture;
+  bool _hasStarted = false;
 
   @override
   void initState() {
@@ -38,7 +37,7 @@ class _AppShellState extends State<AppShell> {
   void _fetchProfile() {
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
-      _profileFuture = Supabase.instance.client
+      Supabase.instance.client
           .from('profiles')
           .select('student_name, avatar_url')
           .eq('id', user.id)
@@ -54,7 +53,7 @@ class _AppShellState extends State<AppShell> {
 
   void _handleWidgetClick(Uri? uri) {
     if (uri != null && (uri.scheme == 'homewidget' || uri.scheme == 'homeWidget') && uri.host == 'log_spend') {
-      setState(() => _currentIndex = 8); // Expenses screen
+      // Logic for deep link
     }
   }
 
@@ -62,21 +61,28 @@ class _AppShellState extends State<AppShell> {
     setState(() => _currentIndex = index);
   }
 
-  // Nav items: icon + label + accent colour
+  void _showRunAnywhereDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const RunAnywhereDialog(),
+    );
+  }
+
+  // BOTTOM NAV ITEMS: The Core Student Journey
   static const _navItems = [
-    (Icons.dashboard_rounded,       'Home',      AppColors.primary),
-    (Icons.calendar_month_rounded,  'Schedule',  AppColors.accent),
-    (Icons.view_kanban_rounded,     'Kanban',    AppColors.warning),
-    (Icons.fact_check_rounded,      'Attend',    AppColors.safe),
-    (Icons.psychology_rounded,      'Focus',     AppColors.primary),
-    (Icons.smart_toy_rounded,       'RAG Assistant', AppColors.accent),
-    (Icons.groups_rounded,          'Study Hub', AppColors.warning),
-    (Icons.description_rounded,     'LaTeX Workspace', AppColors.primary),
-    (Icons.account_balance_wallet_rounded, 'Expenses', AppColors.accent),
+    (Icons.bolt_rounded,            'Pulse',        NBColors.primary),
+    (Icons.psychology_rounded,      'Deep Work',    NBColors.blue),
+    (Icons.auto_awesome_rounded,    'Second Brain', NBColors.purple),
+    (Icons.groups_rounded,          'Squad',        NBColors.warning),
+    (Icons.person_rounded,          'Profile',      NBColors.pink),
   ];
 
   @override
   Widget build(BuildContext context) {
+    if (!_hasStarted) {
+      return LetsGoScreen(onStart: () => setState(() => _hasStarted = true));
+    }
+
     return Scaffold(
       backgroundColor: NBColors.bg,
       appBar: AppBar(
@@ -87,42 +93,75 @@ class _AppShellState extends State<AppShell> {
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_rounded),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            ),
-          ),
-        ],
       ),
       drawer: _buildDrawer(),
       body: IndexedStack(
         index: _currentIndex,
         children: [
           DashboardScreen(onNavigate: _onNavigate),
-          const TimetableScreen(),
-          const KanbanScreen(),
-          const AttendanceScreen(),
           const FocusScreen(),
           const AssistantScreen(),
           const StudyHubRoomsScreen(),
-          const LaTeXPreviewScreen(),
-          const ExpenseScreen(),
+          const ProfileScreen(),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      bottomNavigationBar: _buildBottomNav(),
+      floatingActionButton: _currentIndex == 2 ? null : FloatingActionButton(
         onPressed: () => _showRunAnywhereDialog(context),
         backgroundColor: NBColors.primary,
-        child: const Icon(Icons.bolt_rounded, color: NBColors.black),
+        child: const Icon(Icons.smart_toy_rounded, color: NBColors.black),
       ),
     );
   }
 
-  void _showRunAnywhereDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const RunAnywhereDialog(),
+  Widget _buildBottomNav() {
+    return Container(
+      height: 80,
+      decoration: const BoxDecoration(
+        color: NBColors.white,
+        border: Border(top: BorderSide(color: NBColors.black, width: 3)),
+      ),
+      child: Row(
+        children: List.generate(_navItems.length, (index) {
+          final item = _navItems[index];
+          final isSelected = _currentIndex == index;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => _onNavigate(index),
+              child: Container(
+                color: isSelected ? item.$3.withValues(alpha: 0.1) : Colors.transparent,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isSelected ? item.$3 : Colors.transparent,
+                        border: isSelected ? Border.all(color: NBColors.black, width: 2) : null,
+                        borderRadius: NBRadius.softAll,
+                      ),
+                      child: Icon(
+                        item.$1,
+                        color: NBColors.black,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.$2.toUpperCase(),
+                      style: NBText.label.copyWith(
+                        fontSize: 8,
+                        fontWeight: isSelected ? FontWeight.w900 : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
     );
   }
 
@@ -136,175 +175,77 @@ class _AppShellState extends State<AppShell> {
       ),
       child: Column(
         children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(
-              color: NBColors.primary,
-              border: Border(
-                bottom: BorderSide(color: NBColors.black, width: 2),
-              ),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: NBColors.white,
-                      border: Border.all(color: NBColors.black, width: 2),
-                      borderRadius: NBRadius.softAll,
-                      boxShadow: NBShadows.small,
-                    ),
-                    child: const Icon(
-                      Icons.auto_awesome_rounded,
-                      color: NBColors.black,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'LUMINA',
-                    style: NBText.heading2.copyWith(letterSpacing: 2),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _buildDrawerHeader(),
           Expanded(
-            child: ListView.separated(
+            child: ListView(
               padding: const EdgeInsets.all(16),
-              itemCount: _navItems.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final item = _navItems[index];
-                final isActive = _currentIndex == index;
-                final isRag = index == 5;
-                
-                return GestureDetector(
-                  onTap: () {
-                    _onNavigate(index);
-                    Navigator.pop(context);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isActive 
-                          ? item.$3 
-                          : (isRag ? const Color(0xFFF3E5F5) : NBColors.white),
-                      border: Border.all(
-                        color: NBColors.black, 
-                        width: isRag && !isActive ? 2.5 : 2,
-                      ),
-                      borderRadius: NBRadius.softAll,
-                      boxShadow: isActive ? NBShadows.small : NBShadows.small,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          item.$1,
-                          color: NBColors.black,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            item.$2.toUpperCase(),
-                            style: NBText.label.copyWith(
-                              fontSize: 14,
-                              fontWeight: isActive || isRag ? FontWeight.w900 : FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (isRag && !isActive)
-                          const Icon(Icons.star_rounded, color: Colors.purple, size: 18),
-                        if (isActive) ...[
-                          const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              },
+              children: [
+                _drawerSection('Core Tools'),
+                _drawerItem(Icons.settings_input_component_rounded, 'The Engine', NBColors.primary, () => _push(const EngineScreen())),
+                _drawerItem(Icons.view_kanban_rounded, 'Kanban Board', NBColors.blue, () => _push(const KanbanScreen())),
+                _drawerItem(Icons.description_rounded, 'LaTeX Workspace', NBColors.warning, () => _push(const LaTeXPreviewScreen())),
+                _drawerItem(Icons.payments_rounded, 'Expense Tracker', NBColors.pink, () => _push(const ExpenseScreen())),
+                const SizedBox(height: 20),
+                _drawerSection('Settings'),
+                _drawerItem(Icons.cloud_download_rounded, 'AI Models', NBColors.purple, () {}),
+                _drawerItem(Icons.logout_rounded, 'Logout', NBColors.danger, () => Supabase.instance.client.auth.signOut()),
+              ],
             ),
-          ),
-          // Footer
-          FutureBuilder<Map<String, dynamic>?>(
-            future: _profileFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: NBColors.primary,
-                      strokeWidth: 2,
-                    ),
-                  ),
-                );
-              }
-
-              final user = Supabase.instance.client.auth.currentUser;
-              final profile = snapshot.data;
-              final studentName = profile?['student_name'] as String? ?? 
-                                 user?.email?.split('@')[0] ?? 
-                                 'Student';
-              final avatarUrl = profile?['avatar_url'] as String?;
-
-              return GestureDetector(
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    color: NBColors.white,
-                    border: Border(
-                      top: BorderSide(color: NBColors.black, width: 2),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: NBColors.primary,
-                        backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                        child: avatarUrl == null 
-                            ? const Icon(Icons.person_outline_rounded, color: NBColors.black) 
-                            : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              studentName, 
-                              style: NBText.label, 
-                              maxLines: 1, 
-                              overflow: TextOverflow.ellipsis
-                            ),
-                            Text(
-                              'View Profile', 
-                              style: NBText.bodySmall.copyWith(
-                                fontSize: 10, 
-                                color: NBColors.primary, 
-                                decoration: TextDecoration.underline
-                              )
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right_rounded, color: NBColors.black),
-                    ],
-                  ),
-                ),
-              );
-            },
           ),
         ],
+      ),
+    );
+  }
+
+  void _push(Widget screen) {
+    Navigator.pop(context);
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
+  Widget _buildDrawerHeader() {
+    return DrawerHeader(
+      decoration: const BoxDecoration(
+        color: NBColors.primary,
+        border: Border(bottom: BorderSide(color: NBColors.black, width: 2)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.auto_awesome_rounded, size: 40),
+            const SizedBox(height: 8),
+            Text('LUMINA', style: NBText.heading2.copyWith(letterSpacing: 4)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerSection(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, left: 4),
+      child: Text(title.toUpperCase(), style: NBText.label.copyWith(fontSize: 10, color: const Color(0xFF777777))),
+    );
+  }
+
+  Widget _drawerItem(IconData icon, String label, Color color, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GestureDetector(
+        onTap: onTap,
+        child: NBCard(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          fillColor: NBColors.white,
+          child: Row(
+            children: [
+              Icon(icon, size: 20),
+              const SizedBox(width: 12),
+              Text(label.toUpperCase(), style: NBText.label.copyWith(fontSize: 12)),
+              const Spacer(),
+              const Icon(Icons.chevron_right_rounded, size: 16),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -373,8 +314,8 @@ class _RunAnywhereDialogState extends State<RunAnywhereDialog> {
                   icon: Icons.auto_awesome_rounded,
                   label: _isStreaming ? 'STREAMING...' : 'GENERATE',
                   color: NBColors.primary,
-                  onPressed: _isStreaming ? null : () async {
-                    if (_controller.text.isEmpty) return;
+                  onPressed: () async {
+                    if (_isStreaming || _controller.text.trim().isEmpty) return;
                     setState(() {
                       _isLoading = true;
                       _isStreaming = true;
