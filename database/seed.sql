@@ -1,0 +1,117 @@
+-- Insurance Claim Processing & Fraud Detection Platform
+-- Seed Data for MySQL Database
+USE insurance_claim_db;
+
+-- 1. Insert Roles
+INSERT INTO roles (id, name, description) VALUES
+(1, 'CUSTOMER', 'Policyholder who can submit claims and view real-time status'),
+(2, 'INSURANCE_STAFF', 'Claims processing officer who reviews documents, verifies claims, and renders decisions'),
+(3, 'FRAUD_INVESTIGATOR', 'Specialist who analyzes suspicious claims, reviews indicators, and conducts fraud investigations'),
+(4, 'ADMIN', 'System administrator who manages user accounts, roles, audit trails, and system parameters'),
+(5, 'MANAGER', 'Executive manager who monitors KPIs, approval rates, fraud exposure, and operational throughput')
+ON DUPLICATE KEY UPDATE description=VALUES(description);
+
+-- 2. Insert Users (Password is 'Password123!' for all demo accounts)
+-- bcrypt hash: $2a$10$1pyAv0JhTLtERVWyNg0JLutVRw903t16Y53ByPwcnbl6xJFTs1Q8e
+INSERT INTO users (id, name, email, password_hash, phone, role_id, status) VALUES
+(1, 'Sundar Pichai', 'customer@example.com', '$2a$10$1pyAv0JhTLtERVWyNg0JLutVRw903t16Y53ByPwcnbl6xJFTs1Q8e', '+1-555-0101', 1, 'ACTIVE'),
+(2, 'Elena Rostova', 'customer2@example.com', '$2a$10$1pyAv0JhTLtERVWyNg0JLutVRw903t16Y53ByPwcnbl6xJFTs1Q8e', '+1-555-0102', 1, 'ACTIVE'),
+(3, 'Sarah Jenkins', 'staff@example.com', '$2a$10$1pyAv0JhTLtERVWyNg0JLutVRw903t16Y53ByPwcnbl6xJFTs1Q8e', '+1-555-0201', 2, 'ACTIVE'),
+(4, 'David Miller', 'fraud@example.com', '$2a$10$1pyAv0JhTLtERVWyNg0JLutVRw903t16Y53ByPwcnbl6xJFTs1Q8e', '+1-555-0301', 3, 'ACTIVE'),
+(5, 'Alex Vance', 'admin@example.com', '$2a$10$1pyAv0JhTLtERVWyNg0JLutVRw903t16Y53ByPwcnbl6xJFTs1Q8e', '+1-555-0401', 4, 'ACTIVE'),
+(6, 'Steve Jobs', 'manager@example.com', '$2a$10$1pyAv0JhTLtERVWyNg0JLutVRw903t16Y53ByPwcnbl6xJFTs1Q8e', '+1-555-0501', 5, 'ACTIVE')
+ON DUPLICATE KEY UPDATE name=VALUES(name);
+
+-- 3. Insert Policies
+INSERT INTO policies (id, policy_number, user_id, policy_type, coverage_amount, deductible, start_date, end_date, status) VALUES
+(1, 'POL-2024-AUTO-101', 1, 'AUTO', 50000.00, 500.00, '2024-01-01', '2027-01-01', 'ACTIVE'),
+(2, 'POL-2024-HLTH-202', 1, 'HEALTH', 100000.00, 250.00, '2024-02-15', '2027-02-15', 'ACTIVE'),
+(3, 'POL-2024-HOME-303', 1, 'HOME', 350000.00, 1000.00, '2024-03-01', '2027-03-01', 'ACTIVE'),
+(4, 'POL-2024-AUTO-404', 2, 'AUTO', 30000.00, 500.00, '2025-06-01', '2027-06-01', 'ACTIVE'),
+(5, 'POL-2024-PROP-505', 2, 'PROPERTY', 150000.00, 1500.00, '2025-07-15', '2027-07-15', 'ACTIVE')
+ON DUPLICATE KEY UPDATE policy_type=VALUES(policy_type);
+
+-- 4. Insert Claims
+INSERT INTO claims (id, claim_id, user_id, policy_id, claim_type, incident_date, incident_location, claim_amount, description, current_status, verification_status, fraud_risk_score, fraud_risk_level, assigned_staff_id, payout_amount, decision_reason, created_at) VALUES
+(1, 'CLM-2026-1001', 1, 1, 'AUTO', '2026-08-10', 'Market Street & 4th, San Francisco, CA', 3450.00, 'Rear bumper collision at intersection with minor fender distortion while vehicle was stationary at red light.', 'APPROVED', 'VERIFIED', 12, 'LOW', 3, 3450.00, 'All invoices verified, police incident report validated, within coverage policy guidelines.', '2026-08-12 10:15:00'),
+(2, 'CLM-2026-1002', 1, 2, 'HEALTH', '2026-09-02', 'Stanford Health Center, CA', 8200.00, 'Emergency surgical appendectomy hospitalization and specialist inpatient consult fees.', 'UNDER_REVIEW', 'VERIFIED', 18, 'LOW', 3, 0.00, NULL, '2026-09-05 14:30:00'),
+(3, 'CLM-2026-1003', 2, 4, 'AUTO', '2026-09-15', 'Highway 101 Milemarker 44, CA', 28500.00, 'Vehicle suffered total loss when striking unattended barrier late at night with no witnesses present.', 'INVESTIGATION_REQUIRED', 'PENDING', 82, 'HIGH', NULL, 0.00, NULL, '2026-09-16 09:00:00'),
+(4, 'CLM-2026-1004', 2, 5, 'PROPERTY', '2026-09-20', '742 Evergreen Terrace, Springfield', 48000.00, 'Extensive water damage and structural flooring breakdown due to sudden high-pressure pipe rupture.', 'INVESTIGATION_IN_PROGRESS', 'PENDING', 74, 'HIGH', 3, 0.00, NULL, '2026-09-22 11:20:00'),
+(5, 'CLM-2026-1005', 1, 3, 'HOME', '2026-09-28', '124 Conch Street, Pacifica, CA', 1850.00, 'Hail storm impact damage resulting in fractured roof tiles and dented rainwater drainage gutters.', 'SUBMITTED', 'PENDING', 22, 'LOW', NULL, 0.00, NULL, '2026-09-29 08:45:00'),
+(6, 'CLM-2026-1006', 2, 4, 'AUTO', '2026-07-04', 'Industrial Parkway, Oakland, CA', 15200.00, 'Multiple body panel scratches and electronic mirror detachment in quiet parking lot.', 'REJECTED', 'REJECTED', 88, 'HIGH', 3, 0.00, 'Fabricated repair estimate detected; vendor invoice numbers could not be authenticated during field audit.', '2026-07-06 16:10:00')
+ON DUPLICATE KEY UPDATE description=VALUES(description);
+
+-- 5. Insert Claim Documents
+INSERT INTO claim_documents (id, claim_id, document_type, file_name, original_name, file_path, file_size, mime_type, verification_status, verification_notes, uploaded_by, verified_by, uploaded_at, verified_at) VALUES
+(1, 1, 'Police Report', 'police_report_1001.pdf', 'SFPD_Collision_Report_2026.pdf', 'uploads/police_report_1001.pdf', 342100, 'application/pdf', 'VERIFIED', 'Valid SFPD seal and badge verification confirmed.', 1, 3, '2026-08-12 10:20:00', '2026-08-13 11:00:00'),
+(2, 1, 'Repair Estimate', 'repair_invoice_1001.pdf', 'Apex_BodyShop_Repair_Estimate.pdf', 'uploads/repair_invoice_1001.pdf', 184500, 'application/pdf', 'VERIFIED', 'Labor rates match regional standard schedule.', 1, 3, '2026-08-12 10:22:00', '2026-08-13 11:05:00'),
+(3, 2, 'Medical Discharge Summary', 'discharge_summary_1002.pdf', 'Hospital_Discharge_Summary.pdf', 'uploads/discharge_summary_1002.pdf', 512000, 'application/pdf', 'VERIFIED', 'Authentic physician signature and hospital code.', 1, 3, '2026-09-05 14:35:00', '2026-09-06 09:30:00'),
+(4, 2, 'Pharmacy & Treatment Bill', 'medical_bills_1002.pdf', 'Pharmacy_Itemized_Invoice.pdf', 'uploads/medical_bills_1002.pdf', 248000, 'application/pdf', 'VERIFIED', 'Prescription details verified against hospital order.', 1, 3, '2026-09-05 14:38:00', '2026-09-06 09:35:00'),
+(5, 3, 'Towing Invoice', 'towing_bill_1003.pdf', 'Highway_Towing_Receipt.pdf', 'uploads/towing_bill_1003.pdf', 98000, 'application/pdf', 'PENDING', NULL, 2, NULL, '2026-09-16 09:10:00', NULL),
+(6, 4, 'Plumber Inspection Report', 'plumbing_report_1004.pdf', 'Emergency_Plumbing_Log.pdf', 'uploads/plumbing_report_1004.pdf', 156000, 'application/pdf', 'PENDING', NULL, 2, NULL, '2026-09-22 11:25:00', NULL),
+(7, 6, 'Vendor Estimate', 'forged_estimate_1006.pdf', 'Custom_Autobody_Estimate.pdf', 'uploads/forged_estimate_1006.pdf', 84000, 'application/pdf', 'REJECTED', 'Tax identification number belongs to an inactive business entity.', 2, 3, '2026-07-06 16:15:00', '2026-07-08 14:20:00')
+ON DUPLICATE KEY UPDATE document_type=VALUES(document_type);
+
+-- 6. Insert Fraud Analysis
+INSERT INTO fraud_analysis (id, claim_id, risk_score, risk_level, triggered_rules, analysis_details, analyzed_at) VALUES
+(1, 1, 12, 'LOW', '[{"ruleId":"BASE_SCAN","description":"Standard underwriting profile","weight":12}]', '{"coverageRatio":0.069,"flaggedKeywords":[]}', '2026-08-12 10:16:00'),
+(2, 2, 18, 'LOW', '[{"ruleId":"MEDICAL_EXPENSE_AUDIT","description":"Hospital procedural coding confirmed","weight":18}]', '{"coverageRatio":0.082}', '2026-09-05 14:31:00'),
+(3, 3, 82, 'HIGH', '[{"ruleId":"RULE_COVERAGE_EXHAUSTION","category":"Financial","severity":"HIGH","description":"Claim amount is 95% of policy coverage limit ($28,500 / $30,000)","weight":25},{"ruleId":"RULE_HIGH_VALUE_THRESHOLD","category":"Financial","severity":"MEDIUM","description":"High loss claimed in single motor incident","weight":15},{"ruleId":"RULE_SUSPICIOUS_VOCABULARY","category":"Pattern","severity":"MEDIUM","description":"Description contains high-scrutiny keyword indicators: unattended","weight":12},{"ruleId":"RULE_MULTIPLE_RECENT_CLAIMS","category":"Frequency","severity":"HIGH","description":"Customer submitted 2 other claims within the last 6 months","weight":20},{"ruleId":"RULE_PRIOR_SUSPICIOUS_HISTORY","category":"Frequency","severity":"HIGH","description":"Policyholder has prior claims that were rejected or flagged as high risk","weight":25}]', '{"flaggedTerms":["unattended","total loss"],"coverageRatio":0.95}', '2026-09-16 09:02:00'),
+(4, 4, 74, 'HIGH', '[{"ruleId":"RULE_HIGH_VALUE_THRESHOLD","category":"Financial","severity":"MEDIUM","description":"Claim amount ($48,000) exceeds high-risk property review threshold","weight":15},{"ruleId":"RULE_MULTIPLE_RECENT_CLAIMS","category":"Frequency","severity":"HIGH","description":"Repeat claim activity within short window","weight":20},{"ruleId":"RULE_PRIOR_SUSPICIOUS_HISTORY","category":"Frequency","severity":"HIGH","description":"Policyholder account has prior rejected claim records","weight":25}]', '{"coverageRatio":0.32}', '2026-09-22 11:21:00'),
+(5, 5, 22, 'LOW', '[{"ruleId":"WEATHER_CORRELATION","description":"Incident aligns with localized meteorological hail storm advisories","weight":22}]', '{"coverageRatio":0.005}', '2026-09-29 08:46:00'),
+(6, 6, 88, 'HIGH', '[{"ruleId":"RULE_COVERAGE_EXHAUSTION","description":"Claim volume spikes right after policy inception","weight":25},{"ruleId":"RULE_SUSPICIOUS_VOCABULARY","description":"Ambiguous vandalism report without third party details","weight":12}]', '{"coverageRatio":0.506}', '2026-07-06 16:11:00')
+ON DUPLICATE KEY UPDATE risk_score=VALUES(risk_score);
+
+-- 7. Insert Fraud Investigations
+INSERT INTO fraud_investigations (id, claim_id, investigator_id, status, findings, recommended_action, assigned_at, completed_at) VALUES
+(1, 3, 4, 'OPEN', 'Preliminary check indicates collision occurred in unlit industrial corridor. Telematics data requested from vehicle computer.', 'FURTHER_REVIEW', '2026-09-16 10:00:00', NULL),
+(2, 4, 4, 'UNDER_INVESTIGATION', 'Physical site inspection scheduled with forensic plumbing consultant. Previous water damage claims noted with prior carrier.', 'FURTHER_REVIEW', '2026-09-22 14:00:00', NULL),
+(3, 6, 4, 'CONFIRMED_FRAUD', 'Investigator verified autobody shop does not exist at listed premises. Forged invoice stamps and duplicate photos from internet vehicle forum.', 'DENY_CLAIM', '2026-07-06 17:00:00', '2026-07-08 14:00:00')
+ON DUPLICATE KEY UPDATE status=VALUES(status);
+
+-- 8. Insert Claim Status History
+INSERT INTO claim_status_history (id, claim_id, from_status, to_status, changed_by_user_id, notes, created_at) VALUES
+(1, 1, NULL, 'SUBMITTED', 1, 'Claim submitted online by customer with initial repair bills.', '2026-08-12 10:15:00'),
+(2, 1, 'SUBMITTED', 'UNDER_REVIEW', 3, 'Claim picked up by Claim Processor Sarah Jenkins.', '2026-08-13 09:30:00'),
+(3, 1, 'UNDER_REVIEW', 'DOCS_VERIFIED', 3, 'Supporting documents verified against police department records.', '2026-08-13 11:06:00'),
+(4, 1, 'DOCS_VERIFIED', 'APPROVED', 3, 'Claim approved for full reimbursement of $3,450.00.', '2026-08-14 15:00:00'),
+(5, 2, NULL, 'SUBMITTED', 1, 'Emergency medical claim submitted online.', '2026-09-05 14:30:00'),
+(6, 2, 'SUBMITTED', 'UNDER_REVIEW', 3, 'Medical invoices sent for standard benefits adjudication.', '2026-09-06 09:36:00'),
+(7, 3, NULL, 'SUBMITTED', 2, 'Total loss motor collision claim submitted.', '2026-09-16 09:00:00'),
+(8, 3, 'SUBMITTED', 'INVESTIGATION_REQUIRED', 3, 'Automated fraud risk engine flagged score of 82/100. Forwarded to SIU Fraud Unit.', '2026-09-16 09:05:00'),
+(9, 4, NULL, 'SUBMITTED', 2, 'Property water loss claim submitted.', '2026-09-22 11:20:00'),
+(10, 4, 'SUBMITTED', 'INVESTIGATION_IN_PROGRESS', 4, 'Investigator David Miller opened active case inquiry.', '2026-09-22 14:05:00'),
+(11, 5, NULL, 'SUBMITTED', 1, 'Hail damage claim lodged with roofing photos.', '2026-09-29 08:45:00'),
+(12, 6, NULL, 'SUBMITTED', 2, 'Parking lot scratch claim submitted.', '2026-07-06 16:10:00'),
+(13, 6, 'SUBMITTED', 'INVESTIGATION_REQUIRED', 3, 'High fraud index flagged.', '2026-07-06 16:12:00'),
+(14, 6, 'INVESTIGATION_REQUIRED', 'REJECTED', 3, 'Claim formally rejected due to fabricated documentation.', '2026-07-08 14:25:00')
+ON DUPLICATE KEY UPDATE notes=VALUES(notes);
+
+-- 9. Insert Notifications
+INSERT INTO notifications (id, user_id, claim_id, title, message, type, is_read, created_at) VALUES
+(1, 1, 1, 'Claim Approved', 'Your claim CLM-2026-1001 has been approved for payout of $3,450.00.', 'SUCCESS', 1, '2026-08-14 15:01:00'),
+(2, 1, 2, 'Documents Verified', 'All hospital records for claim CLM-2026-1002 have been verified.', 'INFO', 0, '2026-09-06 09:37:00'),
+(3, 1, 5, 'Claim Received', 'Your claim CLM-2026-1005 has been registered and is pending document review.', 'INFO', 0, '2026-09-29 08:46:00'),
+(4, 2, 3, 'Claim Under Special Review', 'Your claim CLM-2026-1003 is undergoing routine verification checks.', 'WARNING', 0, '2026-09-16 09:06:00'),
+(5, 4, 3, 'High Risk Alert', 'Claim CLM-2026-1003 flagged with Fraud Risk Score of 82%. Assigned to your queue.', 'ALERT', 0, '2026-09-16 09:05:00'),
+(6, 4, 4, 'Fraud Investigation Required', 'Claim CLM-2026-1004 flagged with Risk Score 74%. Pending SIU investigation.', 'ALERT', 0, '2026-09-22 11:22:00')
+ON DUPLICATE KEY UPDATE title=VALUES(title);
+
+-- 10. Insert Audit Logs
+INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, ip_address, details, created_at) VALUES
+(1, 1, 'LOGIN_SUCCESS', 'USER', '1', '192.168.1.101', '{"email":"customer@example.com"}', '2026-08-12 10:00:00'),
+(2, 1, 'CLAIM_SUBMITTED', 'CLAIM', 'CLM-2026-1001', '192.168.1.101', '{"amount":3450.00,"policy":"POL-2024-AUTO-101"}', '2026-08-12 10:15:00'),
+(3, 3, 'DOCUMENT_VERIFIED', 'DOCUMENT', '1', '192.168.1.205', '{"status":"VERIFIED","document":"Police Report"}', '2026-08-13 11:00:00'),
+(4, 3, 'CLAIM_APPROVED', 'CLAIM', 'CLM-2026-1001', '192.168.1.205', '{"payout":3450.00,"reason":"Approved after full review"}', '2026-08-14 15:00:00'),
+(5, 2, 'CLAIM_SUBMITTED', 'CLAIM', 'CLM-2026-1003', '192.168.1.115', '{"amount":28500.00,"policy":"POL-2024-AUTO-404"}', '2026-09-16 09:00:00'),
+(6, 4, 'INVESTIGATION_OPENED', 'INVESTIGATION', '1', '192.168.1.220', '{"claimId":"CLM-2026-1003","initialRisk":82}', '2026-09-16 10:00:00')
+ON DUPLICATE KEY UPDATE action=VALUES(action);
+
+-- 11. Insert System Settings
+INSERT INTO system_settings (key_name, value_data, description) VALUES
+('fraud_high_risk_threshold', '65', 'Score threshold above which claims are automatically routed to Fraud Investigation Unit'),
+('fraud_medium_risk_threshold', '35', 'Score threshold for supervisor review notification'),
+('auto_flagging_enabled', 'true', 'Whether claims exceeding threshold automatically lock staff approval until investigator clearance'),
+('max_file_size_mb', '10', 'Maximum allowed attachment size in Megabytes'),
+('allowed_mime_types', 'application/pdf,image/jpeg,image/png,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Allowed upload file MIME types')
+ON DUPLICATE KEY UPDATE value_data=VALUES(value_data);

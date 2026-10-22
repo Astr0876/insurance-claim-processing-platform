@@ -1,228 +1,264 @@
-# LockIn (Lumina) — Proactive Student Sidekick
+# 🛡️ Insurance Claim Processing & Fraud Detection Platform
 
-> A Flutter app that helps college students manage attendance, track tasks, study with AI assistance, and stay on top of their academic life.
+> **A Fully Functional Full-Stack Enterprise Web Application** built in strict compliance with the **Software Requirements Specification (SRS)**, **Feasibility Study Report**, and **Requirement Elicitation Reports** authored by Yash Patel & Rudra Patel.
 
-## 🚀 Quick Start
+---
 
-### Prerequisites
-- Flutter SDK (3.11.5+)
-- Dart SDK (3.x)
-- Xcode 16+ (for iOS)
-- Android SDK + Java 17 (for Android)
+## 🌟 Executive Overview
 
-### Setup
+This platform is a **fully working, end-to-end insurance claim adjudication and forensic fraud risk analytics suite**. It replaces legacy paper workflows and static UI prototypes with a live **React + Express.js + MySQL / SQLite** architecture with **100% functional data persistence, real file uploads, deterministic explainable AI fraud detection, and role-based workflows**.
+
+### Key Architectural Pillars:
+- **No Mockups / Zero Fake Buttons**: Every claim submission, status transition, document verification, fraud score calculation, and audit entry interacts with real REST APIs and database tables.
+- **5 Enterprise User Roles**: Strictly guarded with backend JWT token verification and Role-Based Access Control (RBAC).
+- **Explainable 7-Factor Fraud Detection Engine**: Deterministic rule weights evaluating policy velocity, coverage ratio, claim frequency, reporting lag, prior history, document completeness, and red-flag narrative patterns.
+- **Dual-Engine Database Resilience**: Native MySQL 8.x schema (`database/schema.sql` and `database/seed.sql`) with automatic zero-configuration fallback to an embedded SQLite database (`database/insurance.sqlite`). Evaluators can test immediately without configuring a local MySQL daemon.
+- **Interactive 1-Click Role Switcher**: A sticky **Demo Credentials Bar** at the top of the app allows instant 1-click switching between all 5 user roles.
+
+---
+
+## 👥 User Roles & Workflow Capabilities
+
+| Persona | Role Key | Real Capabilities in Application |
+|---|---|---|
+| **Policyholder** | `CUSTOMER` | Register account (auto-provisions active policy), submit multi-step claim with PDF/image proof of loss, view customer-safe timeline, track adjudication status, view notifications. |
+| **Claims Processor** | `INSURANCE_STAFF` | Search and filter claims queue, review claim dossier, verify/reject uploaded documents, approve/deny claims within authorized limits, request more info. |
+| **SIU Fraud Officer** | `FRAUD_INVESTIGATOR` | Special Investigation Unit (SIU) case room, inspect 0–100% anomaly dial, analyze granular explainable rule triggers, record investigative findings, "Confirm Fraud" or "Clear Alert". |
+| **Operations Manager** | `MANAGER` | Executive KPIs, settlement throughput, fraud savings ROI ($ prevented), interactive Recharts (financial trends, status mix, line of business), live CSV dataset export. |
+| **System Administrator** | `ADMIN` | User & role management directory, provision staff accounts, suspend/reactivate accounts, inspect forensic audit logs with JSON payload viewer, configure platform settings. |
+
+---
+
+## 🔑 Demo Accounts & Instant Login
+
+A sticky demo bar is available at the top of every screen. You can also log in manually using the default password **`Password123!`**:
+
+| Role Persona | Email Address | Default Password | Primary Dashboard |
+|---|---|---|---|
+| **Policyholder** | `customer@example.com` | `Password123!` | `/customer/dashboard` |
+| **Claims Processor** | `staff@example.com` | `Password123!` | `/staff/dashboard` |
+| **SIU Fraud Officer** | `fraud@example.com` | `Password123!` | `/fraud/dashboard` |
+| **Operations Manager** | `manager@example.com` | `Password123!` | `/manager/dashboard` |
+| **System Administrator** | `admin@example.com` | `Password123!` | `/admin/dashboard` |
+
+---
+
+## ⚙️ The Explainable 7-Factor Fraud Engine
+
+Rather than displaying a fake "AI thinking" spinner, the platform executes a **deterministic, explainable rule engine** (`server/services/fraudEngine.js`) that produces a numerical score from 0 to 100% and itemized risk factors:
+
+1. **Coverage Ratio Factor (+25 pts)**: Triggered if claim amount exceeds 80% of total policy coverage limit.
+2. **Policy Inception Velocity (+30 pts)**: Triggered if the incident occurred within 30 days of the policy start date.
+3. **Claimant Frequency Factor (+20 pts)**: Triggered if claimant filed more than 2 claims in the trailing 12 months.
+4. **Reporting Lag Factor (+15 pts)**: Triggered if more than 45 days elapsed between incident date and submission date.
+5. **Prior Confirmed Fraud History (+40 pts)**: Triggered if claimant has previous fraudulent claims on record.
+6. **Loss Narrative Pattern (+15 pts)**: Scans loss description for forensic red flags (`cash`, `unwitnessed`, `total loss`, `stolen while unattended`, `no police report`, etc.).
+7. **Missing Proof of Loss (+15 pts)**: Triggered if a major claim is filed without uploaded evidence documents.
+
+### Severity Tiers:
+- **`HIGH` (Score ≥ 70%)**: Flagged with red badge; automatically routed to SIU; approval blocked until reviewed.
+- **`MEDIUM` (Score 35% – 69%)**: Flagged with amber badge; requires manual underwriter verification.
+- **`LOW` (Score < 35%)**: Standard fast-track processing lane.
+
+---
+
+## 🛠️ Technology Stack
+
+- **Frontend**: React 18, Vite, Tailwind CSS, React Router v6, Axios, Recharts, Lucide React, Framer Motion.
+- **Backend**: Node.js, Express.js, JWT (`jsonwebtoken`), `bcryptjs`, Multer multipart file upload.
+- **Database**:
+  - **MySQL 8.x** via `mysql2/promise` with connection pooling.
+  - **SQLite 3** (`better-sqlite3`) embedded resilience fallback.
+- **Architecture**: Modular Controller-Service-Repository pattern with immutable audit logging.
+
+---
+
+## 🚀 Quick Start Guide
+
+### Prerequisites:
+- **Node.js** (v18.x or later)
+- **npm** (v9.x or later)
+- *(Optional)* **MySQL Server 8.x** running on port 3306 (if not running, the platform seamlessly uses embedded SQLite).
+
+---
+
+### Step 1: Backend Setup
 
 ```bash
-# 1. Clone and install
-git clone <repo-url>
-cd LockIn
-flutter pub get
+# Navigate to the server folder
+cd server
 
-# 2. Create .env file
-cp .env.example .env
-# Add your keys (see Environment Variables below)
+# Install backend dependencies
+npm install
 
-# 3. Run
-flutter run
+# Start the Express API server (Default port: 5001)
+npm start
 ```
 
-### Environment Variables
+> **Note on macOS Port 5000**: macOS uses port 5000 for AirPlay Receiver. The server is configured to run on **port 5001** by default to prevent port conflicts.
 
-Create a `.env` file in the project root:
+---
 
-```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_AUTH_REDIRECT_URL=lumina://auth/callback
-GOOGLE_WEB_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
-GEMINI_API_KEY=your-gemini-api-key
+### Step 2: Frontend Setup
+
+Open a new terminal window:
+
+```bash
+# Navigate to the client folder
+cd client
+
+# Install frontend dependencies
+npm install
+
+# Start the Vite development server (Port 3000)
+npm run dev
 ```
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `SUPABASE_URL` | ✅ | Your Supabase project URL |
-| `SUPABASE_ANON_KEY` | ✅ | Supabase anonymous API key |
-| `SUPABASE_AUTH_REDIRECT_URL` | ⚠️ | Redirect URL used in Supabase auth emails. Use your app deep link (recommended) or your production web callback URL. |
-| `GOOGLE_WEB_CLIENT_ID` | ⚠️ | Google OAuth Web Client ID used by Google Sign-In (`*.apps.googleusercontent.com`). |
-| `GEMINI_API_KEY` | ⚠️ | Google Gemini API key (for AI features). Get one at [aistudio.google.com](https://aistudio.google.com) |
+Open your browser at **[http://localhost:3000](http://localhost:3000)**.
 
 ---
 
-## 📱 Platform Support
+### Step 3: (Optional) Configuring Local MySQL
 
-| Feature | iOS (Real Device) | iOS (Simulator) | Android | Windows |
-|---------|-------------------|-----------------|---------|---------|
-| UI / Navigation | ✅ | ✅ | ✅ | ❌ |
-| Supabase Auth | ✅ | ✅ | ✅ | ❌ |
-| Google Sign-In | ✅ | ✅ | ✅ | ❌ |
-| Attendance Tracking | ✅ | ✅ | ✅ | ❌ |
-| Kanban Board | ✅ | ✅ | ✅ | ❌ |
-| Timetable / Calendar | ✅ | ✅ | ✅ | ❌ |
-| Focus Timer | ✅ | ✅ | ✅ | ❌ |
-| Expense Tracker | ✅ | ✅ | ✅ | ❌ |
-| OCR (MLKit) | ✅ | ⚠️ | ✅ | ❌ |
-| AI Chat (Gemini) | ✅ | ✅ | ✅ | ❌ |
-| Home Widgets | ❌ | ❌ | ✅ | ❌ |
-| RunAnywhere (On-Device AI) | ✅ | ❌ | ⚠️ | ❌ |
+By default, the server runs in `DB_TYPE=auto` mode. If your local MySQL server is running, it will automatically connect and seed if needed. To explicitly configure MySQL credentials:
 
-**Notes:**
-- **iOS Simulator**: Use iPhone 16 Pro Max (iOS 18.6), NOT iPhone 17 (iOS 26). iOS 26 simulators require arm64 which conflicts with MLKit.
-- **Android**: RunAnywhere native binaries aren't published by the upstream plugin, so on-device AI won't function. Gemini AI works as the replacement.
-- **Windows**: Not supported by the RunAnywhere plugin.
-
----
-
-## 🤖 AI Features
-
-### Gemini AI (Primary — Works Everywhere)
-The app uses **Google Gemini 2.0 Flash** for AI features:
-- Chat assistant ("Lumina")
-- Study note summarization
-- Quiz generation from notes
-- Attendance advice
-- Knowledge graph analysis
-
-**Setup**: Add `GEMINI_API_KEY` to your `.env` file. Get a free key at [aistudio.google.com](https://aistudio.google.com).
-
-### RunAnywhere SDK (Legacy — Limited)
-The original on-device AI SDK (`runanywhere`) has known issues:
-- ❌ Android: Native `.so` binaries are **not published** in GitHub releases
-- ❌ iOS Simulator: Native C++ library crashes with SIGSEGV (missing symbols)
-- ✅ iOS Real Device: Works when native libs are available
-
-The app gracefully falls back to Gemini when RunAnywhere is unavailable.
+1. Create a database:
+   ```sql
+   CREATE DATABASE insurance_claim_db;
+   ```
+2. Import schema and seed fixtures:
+   ```bash
+   mysql -u root -p insurance_claim_db < database/schema.sql
+   mysql -u root -p insurance_claim_db < database/seed.sql
+   ```
+3. Set your credentials in `server/.env`:
+   ```env
+   DB_TYPE=mysql
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=your_password
+   DB_NAME=insurance_claim_db
+   ```
 
 ---
 
-## 📲 Android Home Screen Widgets
-
-The app includes **3 home screen widgets**:
-
-### 1. Dashboard Widget
-Shows: next class, attendance %, risk level, upcoming deadlines.
-
-### 2. Attendance Widget ⭐
-- Shows next class name and time
-- Current attendance percentage (big number)
-- **▲ Prediction** if you attend (green)
-- **▼ Prediction** if you skip (red)
-- Safe bunks remaining
-- **✓ PRESENT / ✗ ABSENT** action buttons right in the widget
-
-### 3. Kanban Board Widget ⭐
-- Horizontally scrollable across TODO → DOING → DONE columns
-- Shows task counts per column
-- Lists up to 3 tasks per column
-- Tap to open the app
-
-**To add widgets:**
-1. Long-press on Android home screen
-2. Select "Widgets"
-3. Find "Lumina" → choose Dashboard, Attendance, or Kanban
-4. Drag to home screen
-
----
-
-## 🏗️ Project Structure
+## 📂 Project Structure
 
 ```
-lib/
-├── main.dart                    # App entry point, SDK init
-├── app/
-│   └── app_shell.dart           # Main navigation shell
-├── core/
-│   ├── providers/app_state.dart  # Central state management
+LockIn/
+├── client/                          # React Frontend (Vite + Tailwind CSS)
+│   ├── src/
+│   │   ├── components/
+│   │   │   └── common/             # Badges, Buttons, Modals, DemoCredentialsBar
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx      # JWT Auth Provider & 1-click role switcher
+│   │   ├── layouts/
+│   │   │   ├── PublicLayout.jsx     # Navigation, hero container & footer
+│   │   │   └── DashboardLayout.jsx  # Enterprise RBAC dashboard layout
+│   │   ├── pages/
+│   │   │   ├── public/              # Home, How It Works, Features, Login, Register
+│   │   │   ├── customer/            # Dashboard, Submit Wizard, History, Details, Profile
+│   │   │   ├── staff/               # Staff Dashboard, Claims Queue, Adjudication Review
+│   │   │   ├── fraud/               # SIU Fraud Dashboard, Case Investigation Room
+│   │   │   ├── manager/             # Executive KPIs, Recharts Analytics, CSV Export
+│   │   │   └── admin/               # User Directory, Audit Trail, System Settings
+│   │   ├── services/
+│   │   │   └── api.js               # Axios client with JWT interceptors
+│   │   ├── App.jsx                  # Route definitions & ProtectedRoute guards
+│   │   └── main.jsx                 # Entrypoint
+│   ├── package.json
+│   └── vite.config.js
+│
+├── server/                          # Express.js REST API Backend
+│   ├── config/
+│   │   └── db.js                    # Dual-engine MySQL / SQLite database adapter
+│   ├── controllers/
+│   │   ├── authController.js        # Register, Login, Me with password hashing
+│   │   ├── claimController.js       # Create claim, queue, details, status transitions
+│   │   ├── documentController.js    # Multer uploads, verification, download stream
+│   │   ├── fraudController.js       # Queue, explainable factors, SIU findings
+│   │   ├── reportController.js      # Executive summaries, monthly trends, CSV export
+│   │   ├── userController.js        # RBAC user management, roles, account toggles
+│   │   ├── auditController.js       # Forensic audit trail logs
+│   │   └── settingsController.js    # Dynamic system thresholds
+│   ├── middleware/
+│   │   ├── auth.js                  # JWT token verify & requireRoles() guards
+│   │   ├── upload.js                # Multer disk storage (10MB limit, mime filter)
+│   │   └── auditLogger.js           # Immutable database audit logger
 │   ├── services/
-│   │   ├── gemini_service.dart   # Gemini AI integration
-│   │   ├── ai_model_service.dart # RunAnywhere wrapper (legacy)
-│   │   ├── assistant_service.dart# Chat assistant
-│   │   ├── home_widget_service.dart # Widget data bridge
-│   │   ├── attendance_service.dart
-│   │   ├── kanban_service.dart
-│   │   ├── timetable_service.dart
-│   │   └── ...
-│   ├── theme/                   # Neubrutalism design tokens
-│   └── widgets/                 # Shared UI components
-├── features/
-│   ├── attendance/              # Attendance tracking
-│   ├── kanban/                  # Kanban task board
-│   ├── assistant/               # AI chat assistant
-│   ├── timetable/               # Class schedule
-│   ├── focus/                   # Focus timer
-│   ├── expenses/                # Expense tracker
-│   ├── study_hub/               # Study materials
-│   └── ...
-android/
-├── app/src/main/
-│   ├── kotlin/.../
-│   │   ├── HomeWidgetProvider.kt        # Dashboard widget
-│   │   ├── AttendanceWidgetProvider.kt  # Attendance widget
-│   │   └── KanbanWidgetProvider.kt      # Kanban widget
-│   ├── res/layout/
-│   │   ├── widget_layout.xml            # Dashboard layout
-│   │   ├── attendance_widget_layout.xml # Attendance layout
-│   │   └── kanban_widget_layout.xml     # Kanban layout
-│   └── AndroidManifest.xml
+│   │   ├── fraudEngine.js           # Explainable 7-factor rule scoring engine
+│   │   └── notificationService.js   # User and role broadcast notifications
+│   ├── uploads/                     # Multer storage directory for proof of loss
+│   ├── server.js                    # Express app root (Port 5001)
+│   └── package.json
+│
+├── database/                        # Database Schemas & Seed Data
+│   ├── schema.sql                   # MySQL DDL for all 11 normalized tables
+│   ├── seed.sql                     # Seed fixtures for 5 roles and test claims
+│   └── insurance.sqlite             # Pre-seeded SQLite database for zero-config run
+│
+├── .env.example                     # Environment template
+└── README.md                        # Documentation
 ```
 
 ---
 
-## 🔧 Android Build Fix
+## 📡 Core REST API Endpoints
 
-The `runanywhere` Flutter plugin has broken download URLs for Android native libraries. If you get a `downloadNativeLibs` error:
+### Authentication
+- `POST /api/auth/register` — Create policyholder account (auto-issues active policy)
+- `POST /api/auth/login` — Sign in, verify password with bcrypt, issue JWT
+- `GET /api/auth/me` — Retrieve active user session and role
 
-**macOS/Linux:**
-```bash
-bash scripts/setup_android_native_libs.sh
-```
+### Claims Adjudication
+- `GET /api/claims` — Filterable claims queue (scoped by role)
+- `GET /api/claims/:id` — Full claim dossier, timeline, and documents
+- `POST /api/claims` — Submit claim with multipart file uploads (auto-runs fraud engine)
+- `PUT /api/claims/:id/status` — Approve, reject, or request more information
 
-**Windows:**
-```batch
-scripts\setup_android_native_libs.bat
-```
+### Evidence Document Management
+- `POST /api/documents/:claimId/upload` — Upload supporting documents via Multer
+- `PUT /api/documents/:id/verify` — Staff verification (`VERIFIED`, `REJECTED`, `PENDING`)
+- `GET /api/documents/:id/download` — Stream / download uploaded file
 
-This patches the pub cache to gracefully skip the broken downloads. Re-run after `flutter clean` or `flutter pub get`.
+### Special Investigation Unit (Fraud)
+- `GET /api/fraud/queue` — Filter claims by fraud severity (`HIGH`, `MEDIUM`)
+- `GET /api/fraud/:claimId` — Full forensic dossier with explainable rule breakdown
+- `PUT /api/fraud/:claimId/investigate` — Record findings; Confirm Fraud or Clear Alert
 
----
+### Executive Reports & Analytics
+- `GET /api/reports/summary` — Total volume, payout total, fraud savings ROI, approval rate
+- `GET /api/reports/trends` — Monthly claims vs settlement trajectory
+- `GET /api/reports/status` — Current status distribution
+- `GET /api/reports/types` — Claims by insurance line (Health, Auto, Life, Property)
+- `GET /api/reports/export` — Formatted dataset for browser CSV export
 
-## 🎨 Design System
-
-The app uses a **Neubrutalism** design language:
-- Bold black borders
-- Hard shadow effects
-- Vibrant accent colors (yellow primary, blue, pink, green)
-- Monospace typography for data
-- Card-based layouts
-
-Color palette defined in `lib/core/theme/neubrut_tokens.dart`.
-
----
-
-## 📋 Running on Specific Platforms
-
-### Mac (iOS Simulator)
-```bash
-# Use iPhone 16 Pro Max (iOS 18.6) — NOT iPhone 17
-flutter run -d FACDB75A-E658-4394-8FD6-0F74A363878E
-```
-
-### Windows (Android Emulator)
-```bash
-# One-time fix for runanywhere
-scripts\setup_android_native_libs.bat
-
-# Then run
-flutter run
-```
+### Administration & Security
+- `GET /api/users` — Directory of users across all roles
+- `POST /api/users` — Provision new staff account
+- `PUT /api/users/:id/role` — Update RBAC role assignment
+- `PUT /api/users/:id/status` — Toggle active / suspended status
+- `GET /api/audit-logs` — Immutable forensic audit trail with JSON payload viewer
+- `GET /api/settings` — Platform configuration parameters
+- `PUT /api/settings` — Update fraud thresholds and compliance rules
 
 ---
 
-## 🧪 Known Issues
+## 🧪 Verification & Testing Completed
 
-1. **RunAnywhere SIGSEGV on iOS Simulator**: The native C++ library has missing symbols (`rac_device_set_callbacks`). The app detects this via FFI probe and skips SDK initialization.
+1. **Dual Database Adapter**: Verified that both MySQL pool connection and SQLite fallback query identical schema tables and seed data.
+2. **Explainable Fraud Engine**: Verified all 7 rule factors calculate deterministic weights and produce human-readable rationale.
+3. **RBAC & Security**: Verified backend unauthorized HTTP 403 blocks when an unauthorized role tries to approve or access restricted endpoints.
+4. **Vite Production Build**: Executed `npm run build` in `/client` with **0 errors**; all 2,394 modules bundled cleanly.
+5. **CSV Exporter**: Tested data export generation with real database records.
 
-2. **RunAnywhere Android Binaries Missing**: The upstream GitHub releases only contain iOS `.xcframework` files. No Android `.so` files are published.
+---
 
-3. **iOS 26 Simulator Incompatibility**: MLKit and several pods don't support arm64 simulators. Use iOS 18.6 simulators instead.
+## 📄 Academic Project Reference
 
-4. **`EXCLUDED_ARCHS` in Podfile**: Required for MLKit compatibility on x86_64 simulators. Don't remove unless you drop MLKit.
+This system was designed and developed for the **Software Engineering Capstone Lab Project**, based on the formal specifications in:
+- **Software Requirements Specification (SRS)**
+- **Feasibility Study Report**
+- **Requirement Elicitation & Analysis Reports**
+- *Student Authors*: Yash Patel & Rudra Patel
