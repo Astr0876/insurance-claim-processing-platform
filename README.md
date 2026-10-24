@@ -1,6 +1,6 @@
 ## 🎥 Working Project Video Demonstration
 - **Video Title:** Insurance Claim Processing & Fraud Detection Platform Demo (9 Min)
-- **Direct GitHub Video Link:** [Click to Download/Watch Demo Video](https://github.com/Astr0876/insurance-claim-processing-platform/releases/download/v1.0.0/demo_video.mp4)
+- **Direct GitHub Video Link:** [Click to Download/Watch Demo Video]([https://github.com/Astr0876/insurance-claim-processing-platform/releases/download/v1.0.0/demo_video.mp4](https://github.com/Astr0876/insurance-claim-processing-platform/releases/download/v1.0.0/Screen.Recording.2026-10-21.at.9.37.02.PM.mov))
 # 🛡️ Insurance Claim Processing & Fraud Detection Platform
 
 > **A Fully Functional Full-Stack Enterprise Web Application** built in strict compliance with the **Software Requirements Specification (SRS)**, **Feasibility Study Report**, and **Requirement Elicitation Reports** authored by Yash Patel & Rudra Patel.
